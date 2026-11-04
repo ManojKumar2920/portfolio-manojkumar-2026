@@ -1,0 +1,125 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
+import SkillIcon from '../../components/SkillIcon.astro';
+import { site } from '../../site';
+
+// One case study per project, in the profile page's language: the client large, the work itself wide, the results as
+// quiet figures, the write-up with its headings in the left column, then the stack, the next project and a close.
+export async function getStaticPaths() {
+  const all = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+  const wall = all.filter((p) => p.data.wall);
+  return all.map((entry) => {
+    const i = wall.findIndex((p) => p.id === entry.id);
+    const next = wall[(i + 1) % wall.length] ?? wall[0];
+    return { params: { slug: entry.id }, props: { entry, next } };
+  });
+}
+
+const { entry, next } = Astro.props;
+const { Content } = await render(entry);
+const p = entry.data;
+const m = p.media;
+const kind = p.kind === '3d' ? '3D web' : 'Full-stack';
+const links = p.links.length ? p.links : p.url ? [{ label: 'Visit the project', href: p.url }] : [];
+// one plain line of facts: type, role, timeline, year, field (each once; "3D web · Restaurant" adds only "Restaurant")
+const facts = [...new Set([kind, p.role, p.duration, p.year && String(p.year), p.category.replace(/^3D web · /, '')]
+  .filter((x): x is string => !!x && !(p.kind === '3d' && /^3D web/i.test(x) && x !== kind)))];
+const isFeatured = (id: string) => (site.hallWork as readonly string[]).includes(id);
+
+// logos for the stack, where Simple Icons has one (the rest get the small marker)
+const ICONS: Record<string, string> = {
+  Go: 'go', TypeScript: 'typescript', JavaScript: 'javascript', 'Node.js': 'nodedotjs', NestJS: 'nestjs', Gin: 'gin',
+  Kafka: 'apachekafka', PostgreSQL: 'postgresql', Redis: 'redis', MongoDB: 'mongodb', Kubernetes: 'kubernetes',
+  Docker: 'docker', Cloudflare: 'cloudflare', 'Cloudflare Workers': 'cloudflareworkers', 'Next.js': 'nextdotjs',
+  React: 'react', 'Three.js': 'threedotjs', WebGL: 'webgl', GSAP: 'gsap', Blender: 'blender', npm: 'npm',
+  'GitHub Actions': 'githubactions', 'Tailwind CSS': 'tailwindcss',
+};
+const MONO: Record<string, string> = { AWS: 'aws' };
+const nextMedia = next.data.media;
+const nextPoster = nextMedia ? (nextMedia.type === 'video' ? (nextMedia.poster ?? nextMedia.src) : nextMedia.src) : null;
+---
+
+<Base namespace="work" title={`${p.client}: ${p.title}`} description={p.summary}>
+  <article class="page profile cs">
+    <div class="pf">
+      <nav class="cs-back" aria-label="Back">
+        <a class="pf-link" href="/work">← All work</a>
+        {isFeatured(entry.id) && <a class="pf-link" href="/">Back to the hall</a>}
+      </nav>
+
+      <header class="cs-hero">
+        <h1 class="pf-name">{p.client}</h1>
+        <div class="cs-intro">
+          <p class="pf-role" data-reveal>{p.title}</p>
+          <p class="pf-body" data-reveal>{p.summary}</p>
+          <p class="cs-facts" data-reveal>{facts.join(' · ')}</p>
+          {p.note && <p class="cs-note" data-reveal>{p.note}.</p>}
+          <div class="pf-actions" data-reveal>
+            <a class="btn" href={site.booking.url} data-book={`About a project like ${p.client}`}>Build something like this</a>
+            {links.map((l) => <a class="pf-link" href={l.href} target="_blank" rel="noopener">{l.label} ↗</a>)}
+          </div>
+        </div>
+      </header>
+
+      {m && (
+        <figure class="cs-media" style={m.bg ? `--bg:${m.bg}` : undefined} data-reveal>
+          {m.type === 'video' && (
+            <video src={m.src} poster={m.poster} muted loop playsinline preload="metadata" data-inview-play aria-label={`${p.client}: screen recording`}></video>
+          )}
+          {m.type === 'image' && <img src={m.src} alt={`${p.client}: ${p.title}`} loading="eager" />}
+          {m.type === 'logo' && (
+            <div class="cs-logo"><img src={m.src} alt={p.client} />{m.caption && <span>{m.caption}</span>}</div>
+          )}
+        </figure>
+      )}
+
+      {p.metrics.length > 0 && (
+        <section class="pf-figures">
+          <h2>Results</h2>
+          <dl>
+            {p.metrics.map((x) => (<div data-reveal><dt>{x.value}</dt><dd>{x.label}</dd></div>))}
+          </dl>
+        </section>
+      )}
+
+      <section class="cs-story">
+        <div class="cs-prose"><Content /></div>
+      </section>
+
+      <section class="pf-skills cs-stack">
+        <h2>Built with</h2>
+        <div class="pf-lineup">
+          <div class="pf-row" data-reveal>
+            <h3>{kind === '3D web' ? 'Stack and tools' : 'Stack'}</h3>
+            <ul>
+              {p.services.map((sv) => (
+                <li><SkillIcon icon={ICONS[sv]} mono={MONO[sv]} name={sv} />{sv}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {next.id !== entry.id && (
+        <section class="cs-next">
+          <h2>Next project</h2>
+          <a class="cs-next-link" href={`/work/${next.id}`} data-reveal>
+            {nextPoster && (
+              <figure style={nextMedia?.bg ? `--bg:${nextMedia.bg}` : undefined}>
+                <img src={nextPoster} alt="" loading="lazy" class={nextMedia?.type === 'logo' ? 'is-logo' : ''} />
+              </figure>
+            )}
+            <div>
+              <h3>{next.data.client}</h3>
+              <p>{next.data.title}</p>
+              <span class="pf-more">Read the case study →</span>
+            </div>
+          </a>
+        </section>
+      )}
+    </div>
+    <div class="page-inner"><Footer /></div>
+  </article>
+</Base>

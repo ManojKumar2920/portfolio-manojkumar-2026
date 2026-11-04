@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { site } from '../site';
+
+const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const homeData = {
+  site,
+  projects: projects.map((p) => ({
+    slug: p.id,
+    title: p.data.title,
+    client: p.data.client,
+    category: p.data.category,
+    year: p.data.year,
+    color: p.data.color,
+    sample: p.data.sample,
+    summary: p.data.summary,
+    stack: p.data.services,
+    metrics: p.data.metrics,
+    role: p.data.role,
+    kind: p.data.kind,
+    note: p.data.note,
+    wall: p.data.wall,
+    media: p.data.media,
+  })),
+};
+---
+
+<Base namespace="home">
+  <!-- The home page is drawn on the WebGL canvas. This spacer gives it scroll length. -->
+  <div class="home-scroll" aria-hidden="true"></div>
+
+  <!-- Same copy as real DOM for screen readers, search engines and the no-WebGL fallback. -->
+  <div class="home-copy sr-only">
+    <h1>{site.name}</h1>
+    <p>{site.role}, {site.focus}. {site.pitch}</p>
+        <h2>Experience</h2>
+    <ul>
+      {site.experience.map((e) => <li>{e.role}, {e.org} ({e.place}, {e.period}): {e.line}</li>)}
+      {projects.map((p) => <li><a href={`/work/${p.id}`}>{p.data.client}: {p.data.title}</a>. {p.data.summary}</li>)}
+    </ul>
+    <h2>Stack and education</h2>
+    <ul>{site.stack.map((s) => <li>{s}</li>)}</ul>
+    <p>{site.education.degree}, {site.education.school}. {site.education.detail}.</p>
+    <h2>How I work</h2>
+    <ul>{site.principles.map((s) => <li>{s.title}: {s.line}</li>)}</ul>
+    <h2>Contact</h2>
+    <p><a href={site.booking.url} data-book>Get in touch</a> or email <a href={`mailto:${site.email}`}>{site.email}</a>. More on the <a href="/about">about page</a>.</p>
+    <p>
+      Credits:
+      {site.credits.map((c) => <span> 3D model {c.label} ({c.license}).</span>)}
+    </p>
+  </div>
+
+  <script type="application/json" id="home-data" set:html={JSON.stringify(homeData)} />
+</Base>

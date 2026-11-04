@@ -1,0 +1,66 @@
+---
+// The GitHub contribution calendar, drawn on the page in the site's sunstone orange (data: src/lib/github.ts).
+import { getContributions } from '../lib/github';
+
+interface Props { user: string; href: string }
+const { user, href } = Astro.props;
+const data = await getContributions(user);
+const days = data.days;
+
+// weeks run Sunday → Saturday, as on GitHub; pad the first week so day-of-week rows line up
+const lead = new Date(`${days[0].date}T00:00:00Z`).getUTCDay();
+const cells: (typeof days[number] | null)[] = [...Array(lead).fill(null), ...days];
+const weeks = Math.ceil(cells.length / 7);
+
+// month labels sit over the first week that starts in a new month
+const months: { col: number; label: string }[] = [];
+for (let w = 0; w < weeks; w++) {
+  const d = cells.slice(w * 7, w * 7 + 7).find(Boolean);
+  if (!d) continue;
+  const m = new Date(`${d.date}T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+  if (!months.length || months[months.length - 1].label !== m) months.push({ col: w + 1, label: m });
+}
+if (months.length > 1 && months[1].col - months[0].col < 3) months.shift(); // a stub first month would collide
+if (months.length && weeks - months[months.length - 1].col < 2) months.pop(); // nor is there room for a month just begun
+
+// real figures from the calendar
+const active = days.filter((d) => d.count > 0).length;
+let streak = 0, run = 0;
+for (const d of days) {
+  run = d.count > 0 ? run + 1 : 0;
+  streak = Math.max(streak, run);
+}
+const busiest = days.reduce((a, d) => (d.count > a.count ? d : a), days[0]);
+const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
+const label = (d: typeof days[number]) =>
+  `${d.count === 0 ? 'No' : d.count} contribution${d.count === 1 ? '' : 's'} on ${fmt(d.date, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+const n = (v: number) => v.toLocaleString('en-IN');
+---
+
+<div class="gh">
+  <div class="gh-head">
+    <p class="gh-total"><strong>{n(data.total)}</strong> contributions in the last year</p>
+    <a class="pf-link" href={href} target="_blank" rel="noopener">github.com/{user} ↗</a>
+  </div>
+
+  <div class="gh-scroll" data-scroll-end>
+    <div class="gh-cal" style={`--weeks:${weeks}`} role="img" aria-label={`GitHub contributions: ${n(data.total)} in the last year, ${active} active days, longest streak ${streak} days.`}>
+      <div class="gh-months" aria-hidden="true">
+        {months.map((m) => <span style={`grid-column:${m.col}`}>{m.label}</span>)}
+      </div>
+      <div class="gh-days" aria-hidden="true"><span>Mon</span><span>Wed</span><span>Fri</span></div>
+      <div class="gh-grid">
+        {cells.map((d) => (d ? <i class={`l${d.level}`} title={label(d)}></i> : <i class="pad"></i>))}
+      </div>
+    </div>
+  </div>
+
+  <div class="gh-foot">
+    <dl class="gh-facts">
+      <div><dt>{active}</dt><dd>active days</dd></div>
+      <div><dt>{streak} days</dt><dd>longest streak</dd></div>
+      <div><dt>{busiest.count}</dt><dd>on the busiest day ({fmt(busiest.date, { day: 'numeric', month: 'short' })})</dd></div>
+    </dl>
+    <p class="gh-legend" aria-hidden="true">Less <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> More</p>
+  </div>
+</div>

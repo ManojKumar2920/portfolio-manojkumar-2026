@@ -1,0 +1,237 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+import SkillIcon from '../components/SkillIcon.astro';
+import GitHubCalendar from '../components/GitHubCalendar.astro';
+import { site } from '../site';
+import { availabilityText } from '../lib/availability';
+
+// Profile: one static page, two ways in. "Hire me" reads as a resume for a full-time role; "Start a project" is the
+// freelance offer. The switch flips between them and mirrors the choice in the URL (#hire, #project).
+const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const shown = projects.filter((p) => p.data.wall && p.data.media);
+// freelance: the websites and 3D work first, then the full-stack products · hire me: full-stack only
+const fullstackWork = shown.filter((p) => p.data.kind === 'fullstack');
+// freelance bento: each half opens on its strongest piece (it takes the large tile)
+const lead = ['blue-blues', 'crux'];
+// a logo suits any width, so a mark-only piece (MoveIt) takes the closing wide band
+const first = (list: typeof shown) => {
+  const rank = (p: (typeof shown)[number]) => (lead.includes(p.id) ? 0 : p.data.media?.type === 'logo' ? 2 : 1);
+  return [...list].sort((a, b) => rank(a) - rank(b));
+};
+const bentoWork = [...first(shown.filter((p) => p.data.kind === '3d')), ...first(shown.filter((p) => p.data.kind !== '3d'))];
+const poster = (p: (typeof projects)[number]) => {
+  const m = p.data.media!;
+  return m.type === 'video' ? (m.poster ?? m.src) : m.src;
+};
+const kind = (p: (typeof projects)[number]) => (p.data.kind === '3d' ? '3D web' : 'Full-stack');
+const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+const job = site.experience[0];
+const li = site.socials.find((s) => s.label === 'LinkedIn')?.href;
+const gh = site.socials.find((s) => s.label === 'GitHub')?.href;
+const availability = availabilityText(); // build-time default; the browser re-computes it (app.ts)
+---
+
+<Base namespace="about" title="About" description={`${site.name}, ${site.role}: ${site.summary}`}>
+  <div class="page profile" data-profile data-mode="project">
+    <div class="pf">
+      <div class="pf-top">
+        <div class="mode-switch" role="tablist" aria-label="What brings you here">
+          <button role="tab" type="button" data-mode-btn="project" aria-selected="true" aria-controls="mode-project">Start a project</button>
+          <button role="tab" type="button" data-mode-btn="hire" aria-selected="false" aria-controls="mode-hire">Hire me</button>
+          <i class="mode-thumb" aria-hidden="true"></i>
+        </div>
+        <p class="status pf-top-status" aria-live="polite">
+          <i></i><span data-when="project" data-availability>{availability}</span><span data-when="hire">Open to full-time roles</span>
+        </p>
+      </div>
+
+      <!-- ===================== Start a project ===================== -->
+      <div id="mode-project" class="mode" role="tabpanel" data-mode-panel="project">
+        <header class="pf-hero">
+          <div class="pf-hero-text">
+            <h1 class="pf-name pf-name-sm">Let's build your next product</h1>
+            <p class="pf-role" data-reveal>Freelance full-stack, 3D web and AI development, from the first prototype to launch and beyond.</p>
+            <p class="pf-body" data-reveal>Landing pages, 3D websites people remember, web apps, custom software and AI automations, built to hold up under real traffic. I take on a few projects at a time, so each one gets my full attention.</p>
+            <p class="status" data-reveal><i></i><span data-availability>{availability}</span></p>
+            <div class="pf-actions" data-reveal>
+              <a class="btn" href={site.booking.url} data-book>Book a call</a>
+              <a class="pf-link" href={`mailto:${site.email}?subject=New%20project`}>Email the brief</a>
+            </div>
+          </div>
+          <figure class="pf-photo" data-reveal>
+            <img src="/images/manoj-profile.jpg" alt={`${site.name}, freelance full-stack and 3D web developer`} width="880" height="859" loading="eager" />
+          </figure>
+        </header>
+
+        <section class="pf-skills">
+          <h2>What I build</h2>
+          <div class="pf-lineup">
+            {site.freelance.services.map((sv) => (
+              <div class="pf-row pf-service" data-reveal>
+                <h3>{sv.title}</h3>
+                <p>{sv.line}</p>
+                <p class="pf-tools">{sv.tags.join(', ')}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section class="pf-gallery">
+          <h2>Recent work</h2>
+          <div class="pf-grid pf-bento">
+            {bentoWork.map((p) => (
+              <a href={`/work/${p.id}`} class="pf-tile" data-reveal>
+                <figure style={p.data.media?.bg ? `--bg:${p.data.media.bg}` : undefined}>
+                  {p.data.media?.type === 'video' ? (
+                    <video src={p.data.media.src} poster={poster(p)} muted loop playsinline preload="metadata" data-inview-play aria-label={`${p.data.client}: ${p.data.title}`}></video>
+                  ) : (
+                    <img src={poster(p)} alt={`${p.data.client}: ${p.data.title}`} loading="lazy" class={p.data.media?.type === 'logo' ? 'is-logo' : ''} />
+                  )}
+                </figure>
+                <h3>{p.data.client}</h3>
+                <p>{kind(p)} · {p.data.title}</p>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section class="pf-steps">
+          <h2>How a project runs</h2>
+          <ol>
+            {site.freelance.process.map((st) => (<li data-reveal><h3>{st.title}</h3><p>{st.line}</p></li>))}
+          </ol>
+        </section>
+
+        <section class="pf-pricing">
+          <h2>Ways to work together</h2>
+          <div class="pf-plans">
+            {site.freelance.engagements.map((e) => (
+              <div class="pf-plan" data-reveal>
+                <h3>{e.title}</h3>
+                <p class="pf-price">
+                  {e.price && e.from && <small>Starting from</small>}
+                  {e.price ?? 'Ask for a quote'}{e.price && e.from && <sup>*</sup>}
+                  {e.price && e.per && <span> {e.per}</span>}
+                </p>
+                <p>{e.line}</p>
+                <ul>{e.includes.map((x) => <li>{x}</li>)}</ul>
+                <a class="btn" href={site.booking.url} data-book={`Interested in: ${e.title}`}>{e.cta}</a>
+              </div>
+            ))}
+          </div>
+          <p class="pf-fineprint">* Starting prices, in US dollars. Final pricing varies based on requirements.</p>
+        </section>
+
+        <section class="pf-close">
+          <h2>Have something in mind? Let's talk.</h2>
+          <p>Tell me what you're building, who it's for and when you need it, and I'll get back to you with next steps.</p>
+          <div class="pf-actions">
+            <a class="btn" href={site.booking.url} data-book>Book a call</a>
+            <a class="pf-link" href={`mailto:${site.email}?subject=New%20project`}>{site.email}</a>
+          </div>
+        </section>
+      </div>
+      <!-- ===================== Hire me ===================== -->
+      <div id="mode-hire" class="mode" role="tabpanel" data-mode-panel="hire" hidden>
+        <header class="pf-hero">
+          <div class="pf-hero-text">
+            <h1 class="pf-name">{site.name}</h1>
+            <p class="pf-role" data-reveal>Software engineer in Chennai, building distributed systems, cloud backends and 3D web experiences.</p>
+            <p class="pf-body" data-reveal>{site.summary}</p>
+            <p class="status" data-reveal><i></i>Open to full-time roles</p>
+            <div class="pf-actions" data-reveal>
+              <a class="btn" href={`mailto:${site.email}?subject=Full-time%20role`}>Email me</a>
+              {li && <a class="pf-link" href={li} target="_blank" rel="noopener">LinkedIn ↗</a>}
+              {gh && <a class="pf-link" href={gh} target="_blank" rel="noopener">GitHub ↗</a>}
+            </div>
+          </div>
+          <figure class="pf-photo" data-reveal>
+            <img src="/images/manoj-profile.jpg" alt={`${site.name}, ${site.role}, at his desk`} width="880" height="859" loading="eager" />
+          </figure>
+        </header>
+
+        <section class="pf-figures">
+          <h2>At a glance</h2>
+          <dl>
+            {site.highlights.map((h) => (<div data-reveal><dt>{h.value}</dt><dd>{h.label}</dd></div>))}
+          </dl>
+        </section>
+
+        <section class="pf-split">
+          <h2>Experience</h2>
+          <article class="pf-job" data-reveal>
+            <h3>{job.role}, {job.org}</h3>
+            <p class="pf-meta">{job.period} · {job.place}, India</p>
+            <ul>{job.points.map((pt) => <li set:html={bold(pt)} />)}</ul>
+          </article>
+        </section>
+
+        <section class="pf-skills">
+          <h2>Skills</h2>
+          <div class="pf-lineup">
+            {site.skills.map((g) => (
+              <div class="pf-row" data-reveal>
+                <h3>{g.group}</h3>
+                <ul>
+                  {g.items.map((it) => (
+                    <li><SkillIcon icon={'icon' in it ? it.icon : undefined} mono={'mono' in it ? it.mono : undefined} name={it.name} />{it.name}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section class="pf-github">
+          <h2>On GitHub</h2>
+          <GitHubCalendar user="ManojKumar2920" href={gh ?? 'https://github.com/ManojKumar2920'} />
+        </section>
+
+        <section class="pf-gallery">
+          <h2>Selected projects</h2>
+          <div class="pf-grid">
+            {fullstackWork.map((p) => (
+              <a href={`/work/${p.id}`} class="pf-tile" data-reveal>
+                <figure style={p.data.media?.bg ? `--bg:${p.data.media.bg}` : undefined}>
+                  {p.data.media?.type === 'video' ? (
+                    <video src={p.data.media.src} poster={poster(p)} muted loop playsinline preload="metadata" data-inview-play aria-label={`${p.data.client}: ${p.data.title}`}></video>
+                  ) : (
+                    <img src={poster(p)} alt={`${p.data.client}: ${p.data.title}`} loading="lazy" class={p.data.media?.type === 'logo' ? 'is-logo' : ''} />
+                  )}
+                </figure>
+                <h3>{p.data.client}</h3>
+                <p>{kind(p)} · {p.data.title}</p>
+              </a>
+            ))}
+          </div>
+          <a class="pf-link pf-all" href="/work">All work in the gallery →</a>
+        </section>
+
+        <section class="pf-details">
+          <div data-reveal>
+            <h2>Education</h2>
+            <h3>Bachelor of Engineering in Computer Science</h3>
+            <p>{site.education.school}, graduated {site.education.period}. {site.education.grade}.</p>
+          </div>
+          <div data-reveal>
+            <h2>How I work</h2>
+            {site.principles.map((p) => (<p><strong>{p.title}.</strong> {p.line}</p>))}
+          </div>
+        </section>
+
+        <section class="pf-close">
+          <h2>Hiring for a backend or full-stack role?</h2>
+          <p>Tell me about the team and the problems you're solving, and I'll tell you how I'd help.</p>
+          <div class="pf-actions">
+            <a class="btn" href={`mailto:${site.email}?subject=Full-time%20role`}>Email me</a>
+            <a class="pf-link" href={site.booking.url} data-book>Book a call</a>
+          </div>
+        </section>
+      </div>
+
+    </div>
+    <div class="page-inner"><Footer /></div>
+  </div>
+</Base>

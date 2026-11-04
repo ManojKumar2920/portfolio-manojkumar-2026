@@ -1,0 +1,33 @@
+{
+  "name": "portfolio",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev --host",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "trees": "node scripts/optimize-trees.mjs",
+    "props": "node scripts/optimize-props.mjs",
+    "models": "gltf-transform optimize assets-src/models/ruin-source.glb public/models/ruin.glb --compress meshopt --texture-compress webp --texture-size 1024 --simplify-ratio 0.4 --simplify-error 0.002 --join false --flatten false && node scripts/strip-ruin-trees.mjs"
+  },
+  "dependencies": {
+    "@barba/core": "^2.10.3",
+    "astro": "^7.4.5",
+    "gsap": "^3.12.7",
+    "lenis": "^1.1.20",
+    "postprocessing": "^6.36.4",
+    "simple-icons": "^16.36.0",
+    "three": "^0.170.0",
+    "troika-three-text": "^0.52.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@gltf-transform/cli": "^4.1.1",
+    "@types/three": "^0.170.0",
+    "typescript": "^5.7.3"
+  }
+}

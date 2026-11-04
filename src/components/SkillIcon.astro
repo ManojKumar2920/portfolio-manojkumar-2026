@@ -1,0 +1,28 @@
+---
+// A skill's logo from Simple Icons, inlined at build time (no runtime cost). Brand colour is exposed as --brand for
+// the hover state; logos too dark to read on the page fall back to the page's light tone. Without a logo, a monogram.
+import * as icons from 'simple-icons';
+
+interface Props { icon?: string; mono?: string; name: string }
+const { icon, mono, name } = Astro.props;
+const key = icon ? `si${icon[0].toUpperCase()}${icon.slice(1)}` : '';
+const si = key ? (icons as unknown as Record<string, { path: string; hex: string; title: string }>)[key] : undefined;
+const hex = si?.hex ?? 'e0814f';
+const lum = (() => {
+  const n = parseInt(hex, 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+})();
+const brand = lum < 0.25 ? 'var(--bone)' : `#${hex}`;
+const letters = mono ? mono.replace(/[^A-Za-z0-9]/g, '').slice(0, 4) : '';
+---
+
+<span class="skill-icon" style={`--brand:${brand}`} aria-hidden="true">
+  {si ? (
+    <svg viewBox="0 0 24 24" role="img"><path d={si.path} /></svg>
+  ) : letters ? (
+    <span class="mono">{letters}</span>
+  ) : (
+    <i class="dot"></i>
+  )}
+</span>

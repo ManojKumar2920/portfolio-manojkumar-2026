@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+// The work, as a gallery: a liquid-glass carousel of every project (click a card for its case study), an index
+// below it, and instead of a footer the page runs on into About as you keep scrolling.
+const projects = (await getCollection('projects')).filter((p) => p.data.wall).sort((a, b) => a.data.order - b.data.order);
+const KIND = { fullstack: 'Full-stack', '3d': '3D web' } as const;
+const items = projects.map((p) => {
+  const m = p.data.media;
+  const logo = m?.type === 'logo';
+  return {
+    src: m ? (m.type === 'video' ? (m.poster ?? m.src) : m.src) : '/images/note-portrait.jpg',
+    alt: `${p.data.client}: ${p.data.title}`,
+    href: `/work/${p.id}`,
+    label: p.data.client,
+    sub: `${KIND[p.data.kind]} · ${p.data.category.replace(/^3D web · /, '')}`,
+    bg: logo ? m?.bg : undefined,
+    fit: logo ? 'contain' : 'cover',
+    video: m?.type === 'video' ? m.src : undefined,
+  };
+});
+---
+
+<Base namespace="works" title="Work" description="Selected work: full-stack apps, backends and platforms, and 3D web experiences.">
+  <div class="works">
+    <h1 class="works-title">Work gallery</h1>
+    <div class="works-row" data-flex-carousel data-items={JSON.stringify(items)}></div>
+    <p class="works-drag" aria-hidden="true"><span class="l">←</span> <span class="t">Drag to explore</span> <span class="r">→</span></p>
+  </div>
+  <!-- the carousel is a canvas: the same links as a list for keyboards, screen readers and search -->
+  <ul class="sr-only">
+    {projects.map((p) => <li><a href={`/work/${p.id}`}>{p.data.client}: {p.data.title}</a></li>)}
+  </ul>
+</Base>

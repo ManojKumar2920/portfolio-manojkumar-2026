@@ -1,0 +1,51 @@
+---
+import { site } from '../site';
+const year = new Date().getFullYear();
+const mark = 'Engineering with intent';
+---
+
+<footer class="footer" data-footer>
+  <div class="ft-top">
+    <div class="ft-cta">
+      <p class="ft-lead">Have a project or a role in mind?</p>
+      <a class="ft-mail" href={`mailto:${site.email}`}>{site.email}</a>
+      <a class="btn" href={site.booking.url} data-book>Book a call</a>
+    </div>
+    <nav class="ft-cols" aria-label="Footer">
+      <div>
+        <h4>Pages</h4>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/work">Work</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Elsewhere</h4>
+        <ul>
+          {site.socials.map((s) => <li><a href={s.href} target="_blank" rel="noopener">{s.label} ↗</a></li>)}
+        </ul>
+      </div>
+    </nav>
+  </div>
+
+  <!-- the sign-off: an outline that lights up in orange round the cursor (app.ts drives --mx / --my) -->
+  <p class="ft-mark" data-glow aria-label={mark}>
+    <span class="ft-base" data-fit-text aria-hidden="true">{mark}</span>
+    <span class="ft-glow" aria-hidden="true">{mark}</span>
+    <span class="ft-lit" aria-hidden="true">{mark}</span>
+  </p>
+
+  <div class="ft-bottom">
+    <span>© {year} {site.name}. Built in Chennai, India.</span>
+    <span class="ft-credits">
+      {(site.credits as readonly { label: string; license: string; href?: string }[]).map((c) =>
+        c.href ? (
+          <span>3D: <a href={c.href} target="_blank" rel="noopener">{c.label}</a> ({c.license})</span>
+        ) : (
+          <span>3D: {c.label} ({c.license})</span>
+        ),
+      )}
+    </span>
+  </div>
+</footer>

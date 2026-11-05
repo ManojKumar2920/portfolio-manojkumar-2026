@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FavSky } from './Favourites';
 import { pewGeometry, woodTexture } from './furniture';
 import { WorkPanels, exhibitSize, type WorkItem, type WorkSpot } from './WorkPanels';
 
@@ -38,6 +39,14 @@ export function workSpots(count: number, stacked: boolean): WorkSpot[] {
     return { side, z, bay, center: new THREE.Vector3(side * (W / 2 - 0.05), cy, z) };
   });
 }
+/** Hall-local z of the bay that holds the poster lightboxes (left wall), the first bay without work; null if none. */
+export function posterZ(count: number): number | null {
+  const used = count <= BAY_Z.length ? count : Math.ceil(Math.min(count, BAY_Z.length * 2) / 2);
+  return used < BAY_Z.length ? BAY_Z[used] : null;
+}
+/** The lightbox row: its size and the poster set (see the lightboxes in Hall). */
+export const LIGHTBOX = { y: 2.78, h: 1.42, w: 5.05, wallX: W / 2 - 0.04 };
+
 let SPOTS: WorkSpot[] = [];
 let SPOT_HALF = 2.4; // half the exhibit's length along the wall
 const nearWork = (x: number, z: number, reach = 0) => SPOTS.some((w) => Math.sign(x) === w.side && Math.abs(z - w.z) < SPOT_HALF + reach);
@@ -490,6 +499,7 @@ export class Hall {
   private fireMat: THREE.ShaderMaterial;
   private shaftMat: THREE.ShaderMaterial;
   private skyMat: THREE.ShaderMaterial;
+  readonly favs = new FavSky();
   private grassMat: THREE.ShaderMaterial;
   private dust: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private embers: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -522,17 +532,15 @@ export class Hall {
         }
         void main(){
           // moon sits straight above the end of the nave, where the camera looks up
-          vec2 m = vec2(1.0, -7.5);
+          vec2 m = vec2(-1.5, -7.5);
           float d = length(vP - m);
           vec3 col = mix(vec3(0.07, 0.1, 0.19), vec3(0.015, 0.02, 0.045), smoothstep(0.0, 40.0, d));
           col += stars(vP, 0.55, 0.93) * 0.9 + stars(vP + 17.0, 0.25, 0.9) * 0.45;
           // thin moonlit cloud
           float c = n(vP * 0.12 + vec2(uTime * 0.01, 0.0)) * n(vP * 0.31 - vec2(0.0, uTime * 0.008));
           col = mix(col, vec3(0.32, 0.36, 0.48), smoothstep(0.25, 0.6, c) * 0.35 * exp(-d * 0.06));
-          float disc = smoothstep(0.95, 0.85, d);
-          float crater = n(vP * 3.0) * 0.18;
-          col = mix(col, vec3(0.92, 0.94, 1.0) * (1.0 - crater), disc);
-          col += vec3(0.4, 0.5, 0.75) * exp(-d * 0.45) * 0.5; // halo
+          // the moon itself is a model (setMoon); the sky keeps its glow
+          col += vec3(0.4, 0.5, 0.75) * exp(-d * 0.45) * 0.55; // halo
           gl_FragColor = vec4(col, 1.0);
         }`,
     });
@@ -541,6 +549,8 @@ export class Hall {
     sky.position.set(0, 16, zMid - 6);
     sky.renderOrder = -5;
     this.group.add(sky);
+    // visitors' favourite films and series, as stars round the moon (Favourites.ts)
+    this.group.add(this.favs.points);
 
     /* ---------- floor ---------- */
     const floorTex = floorTexture();
@@ -766,12 +776,12 @@ export class Hall {
       const linerGeo = new THREE.BoxGeometry(PW + 0.02, PH + 0.02, 0.03);
       linerGeo.translate(0, 0, 0.015);
       const placements: { x: number; y: number; z: number; ry: number; rx: number; rz: number }[] = [];
-      // the first bay with no work on either wall gets the posters instead of old paintings (below)
-      posterBay = BAY_Z.find((z) => !nearWork(-1, z, -SPOT_HALF + 1.0) && !nearWork(1, z, -SPOT_HALF + 1.0)) ?? null;
+      // the first bay with no work gets the poster lightboxes on its left wall (below)
+      posterBay = posterZ(SPOTS.length);
       for (const z of BAY_Z) {
         for (const side of [-1, 1]) {
           if (nearWork(side, z, -SPOT_HALF + 1.0)) continue; // the work hangs here
-          if (z === posterBay) continue; // the posters hang here
+          if (z === posterBay && side < 0) continue; // the poster lightboxes hang here
           placements.push({ x: side * (W / 2 - 0.035), y: 3.05, z: z - (side > 0 ? 0.35 : 0), ry: side * -Math.PI / 2, rx: 0, rz: (r() - 0.5) * 0.05 });
         }
       }
@@ -804,56 +814,113 @@ export class Hall {
       });
     }
 
-    /* ---------- framed posters in the first free bay: Breaking Bad and Better Call Saul as a pair, Avengers opposite ---------- */
+    /* ---------- my favourites: four backlit cinema lightboxes in a row on the left wall, brass plates below ---------- */
     if (posterBay !== null) {
       const loader = new THREE.TextureLoader();
-      const frameMat = new THREE.MeshStandardMaterial({ color: '#141210', roughness: 0.38, metalness: 0.35 });
-      const lipMat = new THREE.MeshStandardMaterial({ color: '#a7843f', roughness: 0.4, metalness: 0.5, emissive: new THREE.Color('#2a1c08'), emissiveIntensity: 0.4 });
-      const H2 = 1.78, GAP = 0.1, BORDER = 0.1, LIP = 0.025;
-      const posters: { side: number; images: { src: string; aspect: number }[] }[] = [
-        { side: -1, images: [{ src: '/media/posters/breaking-bad.jpg', aspect: 734 / 1100 }, { src: '/media/posters/better-call-saul.jpg', aspect: 776 / 1100 }] },
-        { side: 1, images: [{ src: '/media/posters/avengers.jpg', aspect: 618 / 1100 }] },
+      const caseMat = new THREE.MeshStandardMaterial({ color: '#1b1c1e', roughness: 0.3, metalness: 0.8 });
+      const brass = new THREE.MeshStandardMaterial({ color: '#b08a45', roughness: 0.32, metalness: 0.75, emissive: new THREE.Color('#3a2608'), emissiveIntensity: 0.5 });
+      const films = [
+        { src: '/media/posters/friends.jpg', aspect: 734 / 1100, title: 'Friends', year: '1994' },
+        { src: '/media/posters/breaking-bad.jpg', aspect: 734 / 1100, title: 'Breaking Bad', year: '2008' },
+        { src: '/media/posters/better-call-saul.jpg', aspect: 776 / 1100, title: 'Better Call Saul', year: '2015' },
+        { src: '/media/posters/avengers.jpg', aspect: 734 / 1100, title: 'The Avengers', year: '2012' },
       ];
-      const ring = (iw: number, ih: number, b: number, depth: number, bevel: number) => {
-        const sh = new THREE.Shape();
-        sh.moveTo(-iw / 2 - b, -ih / 2 - b);
-        sh.lineTo(iw / 2 + b, -ih / 2 - b);
-        sh.lineTo(iw / 2 + b, ih / 2 + b);
-        sh.lineTo(-iw / 2 - b, ih / 2 + b);
-        const h = new THREE.Path();
-        h.moveTo(-iw / 2, -ih / 2);
-        h.lineTo(-iw / 2, ih / 2);
-        h.lineTo(iw / 2, ih / 2);
-        h.lineTo(iw / 2, -ih / 2);
-        sh.holes.push(h);
-        return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 1 });
-      };
-      for (const pst of posters) {
-        const widths = pst.images.map((im) => H2 * im.aspect);
-        const iw = widths.reduce((a, b) => a + b, 0) + GAP * (pst.images.length - 1);
-        const g = new THREE.Group();
-        g.position.set(pst.side * (W / 2 - 0.04), 3.05, posterBay);
-        g.rotation.y = pst.side < 0 ? Math.PI / 2 : -Math.PI / 2;
-        const back = new THREE.Mesh(new THREE.BoxGeometry(iw + 0.02, H2 + 0.02, 0.03), new THREE.MeshStandardMaterial({ color: '#0b0a09', roughness: 0.9 }));
-        back.position.z = 0.015;
-        g.add(new THREE.Mesh(ring(iw, H2, BORDER, 0.05, 0.02), frameMat), new THREE.Mesh(ring(iw, H2, LIP, 0.06, 0.006), lipMat), back);
-        let x = -iw / 2;
-        pst.images.forEach((im, k) => {
-          const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.3, roughness: 0.5 });
-          loader.load(im.src, (t) => {
-            t.colorSpace = THREE.SRGBColorSpace;
-            t.anisotropy = 8;
-            mat.map = t;
-            mat.emissiveMap = t;
-            mat.needsUpdate = true;
-          });
-          const pic = new THREE.Mesh(new THREE.PlaneGeometry(widths[k], H2), mat);
-          pic.position.set(x + widths[k] / 2, 0, 0.035);
-          g.add(pic);
-          x += widths[k] + GAP;
+      const H = LIGHTBOX.h, B = 0.06, D = 0.09, GAP = 0.24;
+      const widths = films.map((f) => H * f.aspect);
+      const total = widths.reduce((a, b) => a + b, 0) + films.length * B * 2 + GAP * (films.length - 1);
+      const row = new THREE.Group();
+      row.position.set(-LIGHTBOX.wallX, LIGHTBOX.y, posterBay);
+      row.rotation.y = Math.PI / 2; // face into the nave from the left wall; local +x runs toward −z
+      this.group.add(row);
+      // soft spill of the light boxes on the wall round them
+      const spill = document.createElement('canvas');
+      spill.width = spill.height = 128;
+      const sg = spill.getContext('2d')!;
+      const grd = sg.createRadialGradient(64, 64, 8, 64, 64, 64);
+      grd.addColorStop(0, 'rgba(255,236,210,0.55)');
+      grd.addColorStop(1, 'rgba(255,236,210,0)');
+      sg.fillStyle = grd;
+      sg.fillRect(0, 0, 128, 128);
+      const spillMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(spill), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.38 });
+      // a sheen across the glass
+      const sheen = document.createElement('canvas');
+      sheen.width = 64;
+      sheen.height = 256;
+      const hg = sheen.getContext('2d')!;
+      const lin = hg.createLinearGradient(0, 0, 64, 256);
+      lin.addColorStop(0, 'rgba(255,255,255,0)');
+      lin.addColorStop(0.42, 'rgba(255,255,255,0)');
+      lin.addColorStop(0.5, 'rgba(255,255,255,0.16)');
+      lin.addColorStop(0.58, 'rgba(255,255,255,0)');
+      lin.addColorStop(1, 'rgba(255,255,255,0)');
+      hg.fillStyle = lin;
+      hg.fillRect(0, 0, 64, 256);
+      const glassMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sheen), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.plates = [];
+      let x = -total / 2;
+      films.forEach((f, k) => {
+        const w = widths[k];
+        const cx = x + B + w / 2;
+        // the case: a slim metal box, its face a frame round the lit poster
+        const shell = new THREE.Shape();
+        shell.moveTo(-w / 2 - B, -H / 2 - B);
+        shell.lineTo(w / 2 + B, -H / 2 - B);
+        shell.lineTo(w / 2 + B, H / 2 + B);
+        shell.lineTo(-w / 2 - B, H / 2 + B);
+        const hole = new THREE.Path();
+        hole.moveTo(-w / 2, -H / 2);
+        hole.lineTo(-w / 2, H / 2);
+        hole.lineTo(w / 2, H / 2);
+        hole.lineTo(w / 2, -H / 2);
+        shell.holes.push(hole);
+        const face = new THREE.Mesh(new THREE.ExtrudeGeometry(shell, { depth: D, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 1 }), caseMat);
+        face.position.x = cx;
+        const box = new THREE.Mesh(new THREE.BoxGeometry(w + B * 2, H + B * 2, 0.02), caseMat);
+        box.position.set(cx, 0, 0.01);
+        // the poster, lit from behind: unlit, a touch over white so it glows in the dark nave
+        const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.12, 1.1, 1.06), toneMapped: false });
+        loader.load(f.src, (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = 8;
+          mat.map = t;
+          mat.needsUpdate = true;
         });
-        this.group.add(g);
-      }
+        const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, H), mat);
+        pic.position.set(cx, 0, D - 0.02);
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glassMat);
+        glass.position.set(cx, 0, D + 0.005);
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.1, H * 1.7), spillMat);
+        glow.position.set(cx, 0, 0.004);
+        row.add(glow, box, face, pic, glass);
+        // a brass plate under each: the title and the year
+        const plateW = Math.min(w, 0.86), plateH = 0.19;
+        const pc = document.createElement('canvas');
+        pc.width = 512;
+        pc.height = Math.round((512 * plateH) / plateW);
+        const ptex = new THREE.CanvasTexture(pc);
+        ptex.colorSpace = THREE.SRGBColorSpace;
+        ptex.anisotropy = 8;
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(plateW, plateH, 0.012), [brass, brass, brass, brass, new THREE.MeshBasicMaterial({ map: ptex }), brass]); // enamel face, unlit so it reads in the dark
+        plate.position.set(cx, -H / 2 - B - 0.2, 0.014);
+        row.add(plate);
+        this.plates.push({ canvas: pc, tex: ptex, title: f.title, year: f.year });
+        x += w + B * 2 + GAP;
+      });
+      // a headline plate above the row
+      const head = document.createElement('canvas');
+      head.width = 1024;
+      head.height = 96;
+      const htex = new THREE.CanvasTexture(head);
+      htex.colorSpace = THREE.SRGBColorSpace;
+      const headPlate = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.225), new THREE.MeshBasicMaterial({ map: htex, transparent: true, depthWrite: false }));
+      headPlate.position.set(0, H / 2 + B + 0.24, 0.02);
+      row.add(headPlate);
+      this.plates.push({ canvas: head, tex: htex, title: 'My favourites', year: '', heading: true });
+      // the light the boxes throw into the nave
+      const spillLight = new THREE.PointLight('#ffe6cc', 4, 6, 1.4);
+      spillLight.position.set(-LIGHTBOX.wallX + 0.9, LIGHTBOX.y - 0.2, posterBay);
+      this.group.add(spillLight);
+      this.paintPlates();
     }
 
     this.shaftMat = new THREE.ShaderMaterial({
@@ -1189,8 +1256,66 @@ export class Hall {
     this.group.visible = false;
   }
 
+  private plates: { canvas: HTMLCanvasElement; tex: THREE.CanvasTexture; title: string; year: string; heading?: boolean }[] = [];
+  /** Engrave the lightbox plates once the web fonts are in. */
+  private async paintPlates() {
+    try {
+      await Promise.all([document.fonts.load("400 40px 'Season Sans'"), document.fonts.load("300 40px 'Season Mix'")]);
+    } catch {}
+    for (const p of this.plates) {
+      const g = p.canvas.getContext('2d')!;
+      const { width: w, height: h } = p.canvas;
+      g.clearRect(0, 0, w, h);
+      if (p.heading) {
+        g.fillStyle = 'rgba(231, 227, 220, 0.82)';
+        g.font = "300 64px 'Season Mix', Georgia, serif";
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(p.title, w / 2, h / 2 + 4);
+      } else {
+        // black enamel inside a thin brass edge: title, and the year under it
+        g.fillStyle = '#b08a45';
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = '#16130f';
+        g.fillRect(6, 6, w - 12, h - 12);
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        let size = 44;
+        g.font = `400 ${size}px 'Season Sans', Arial, sans-serif`;
+        while (g.measureText(p.title).width > w - 60 && size > 24) g.font = `400 ${--size}px 'Season Sans', Arial, sans-serif`;
+        g.fillStyle = 'rgba(240, 232, 218, 0.94)';
+        g.fillText(p.title, w / 2, h * 0.4);
+        g.font = "300 30px 'Season Sans', Arial, sans-serif";
+        g.fillStyle = 'rgba(214, 178, 110, 0.95)';
+        g.fillText(p.year, w / 2, h * 0.74);
+      }
+      p.tex.needsUpdate = true;
+    }
+  }
+
+  private moon?: THREE.Object3D;
+  /** The moon over the open roof (public/moon.glb), where the sky shader's glow is centred and the walk ends looking up. */
+  setMoon(gltf: { scene: THREE.Object3D }) {
+    const src = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | undefined;
+    if (!src) return;
+    const geo = src.geometry.clone();
+    geo.center();
+    geo.computeBoundingSphere();
+    const map = (src.material as THREE.MeshStandardMaterial).map;
+    // unlit and out of the fog: it is the light source of this set, not something the set lights
+    const mat = new THREE.MeshBasicMaterial({ map, color: new THREE.Color(1.45, 1.47, 1.55), fog: false });
+    const moon = new THREE.Mesh(geo, mat);
+    moon.scale.setScalar(1.0 / (geo.boundingSphere?.radius || 1));
+    moon.position.set(-1.5, 15.2, -17.5);
+    moon.rotation.set(0.4, 2.2, 0.15);
+    moon.renderOrder = -4;
+    this.group.add(moon);
+    this.moon = moon;
+  }
+
   update(time: number, dt: number, viewportH: number) {
     if (!this.group.visible) return;
+    if (this.moon) this.moon.rotation.y = 2.2 + time * 0.01;
     this.works.update(time, dt);
     for (const f of this.flicker) {
       f.light.intensity = f.base * (0.85 + 0.1 * Math.sin(time * 9 + f.phase) + 0.05 * Math.sin(time * 23 + f.phase * 2));
@@ -1199,6 +1324,7 @@ export class Hall {
     this.fireMat.uniforms.uTime.value = time;
     this.shaftMat.uniforms.uTime.value = time;
     this.skyMat.uniforms.uTime.value = time;
+    this.favs.update(time, viewportH);
     this.grassMat.uniforms.uTime.value = time;
     const s = viewportH / 900;
     for (const p of [this.dust, this.embers, this.flies]) {

@@ -11,7 +11,7 @@ import { HomeUI, type HomeData } from './HomeUI';
 import { Hall, HALL_FOG, HALL_FOG_DENSITY, HALL_ORIGIN } from './Hall';
 
 const DEBUG_CAM = import.meta.env.DEV ? new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null : null;
-import { blackout, fitInterior, setHall, workStops, makeLightState, sceneAt, sampleCamera, sampleLight } from './timeline';
+import { blackout, cloudout, fitInterior, setHall, skyHold, workStops, makeLightState, sceneAt, sampleCamera, sampleLight } from './timeline';
 import type { WorkItem } from './WorkPanels';
 
 export type Mode = 'home' | 'page';
@@ -57,6 +57,7 @@ export class World {
   private reduced: boolean;
   private velocity = 0;
   private time = 0;
+  private moonGltf: { scene: THREE.Object3D } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.isMobile = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
@@ -87,19 +88,20 @@ export class World {
     const manager = new THREE.LoadingManager();
     const loader = new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder);
     // byte sizes of public/models/*.glb, for the loader's progress
-    const sizes = { castle: 1_350_000, trees: 2_210_000, lanterns: 522_000, pond: 1_729_000, bird: 959_000, plane: 250_000 };
-    const got = { castle: 0, trees: 0, lanterns: 0, pond: 0, bird: 0, plane: 0 };
+    const sizes = { castle: 1_350_000, trees: 2_210_000, lanterns: 522_000, pond: 1_729_000, bird: 959_000, plane: 250_000, moon: 1_151_000 };
+    const got = { castle: 0, trees: 0, lanterns: 0, pond: 0, bird: 0, plane: 0, moon: 0 };
     const total = Object.values(sizes).reduce((a, b) => a + b, 0);
     const report = () => onProgress(Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
     const get = (url: string, key: keyof typeof got) => loader.loadAsync(url, (e) => { got[key] = e.loaded; report(); });
     const envP = new RGBELoader(manager).loadAsync('/env/hills.hdr').catch(() => null);
-    const [castle, trees, lanterns, pond, bird, plane, hdr] = await Promise.all([
+    const [castle, trees, lanterns, pond, bird, plane, moon, hdr] = await Promise.all([
       get('/models/ruin.glb', 'castle'),
       get('/models/trees.glb', 'trees'),
       get('/models/lanterns.glb', 'lanterns'),
       get('/models/pond.glb', 'pond'),
       get('/models/hummingbird.glb', 'bird'),
       get('/models/airplane.glb', 'plane'),
+      get('/moon.glb', 'moon').catch(() => null), // the hall's moon; the sky still glows without it
       envP,
     ]);
     let env: THREE.Texture | null = null;
@@ -114,6 +116,7 @@ export class World {
     this.castle = new Ruin(castle, { trees, lanterns, pond, bird }, this.isMobile, env);
     if (import.meta.env.DEV) (window as unknown as { __world: World }).__world = this; // dev: poke at the set from the console
     this.scene.add(this.castle.group);
+    this.moonGltf = moon;
     this.flight = new Flight(plane, this.isMobile);
     this.scene.add(this.flight.group);
     this.applyTier();
@@ -137,6 +140,7 @@ export class World {
     setHall(items.length, stacked);
     this.fitScroll(items.length);
     this.hall = new Hall(items, this.isMobile, stacked);
+    if (this.moonGltf) this.hall.setMoon(this.moonGltf);
     this.scene.add(this.hall.group);
     await this.hall.works.paint();
     this.ui = new HomeUI(data, this.camera);
@@ -174,7 +178,7 @@ export class World {
    */
   private scrollPlan = { ext: 337.5, int: 550, sky: 362.5 };
   private fitScroll(exhibits: number) {
-    this.scrollPlan.int = 110 + 55 * Math.max(1, exhibits);
+    this.scrollPlan.int = 520 + 57 * Math.max(1, exhibits); // + the poster lightboxes, the walk out and a long hold under the sky
     this.applyScrollHeight();
   }
   private applyScrollHeight() {
@@ -198,9 +202,9 @@ export class World {
   private ray = new THREE.Raycaster();
   private stops: number[] = [];
   /** The exhibit the camera is at or walking toward (its reel plays). */
-  private nearestWork() {
+  private nearestWork(reach = 0.04) {
     if (!this.stops.length) this.stops = workStops();
-    let best = -1, bd = 0.04;
+    let best = -1, bd = reach;
     this.stops.forEach((s, i) => {
       const d = Math.abs(this.progress - s);
       if (d < bd) (bd = d), (best = i);
@@ -224,8 +228,24 @@ export class World {
       if (this.hall) this.hall.works.hovered = -1;
       return true;
     }
-    return !!this.pickWork();
+    if (this.pickWork()) return true;
+    return this.starAt(x, y) >= 0;
   }
+
+
+  /** The visitor's favourite (a star over the roof) under the pointer, or −1; also marks it hovered. */
+  starAt(x?: number, y?: number) {
+    const favs = this.hall?.favs;
+    if (!favs) return -1;
+    const on = this.stage.sky && x !== undefined && y !== undefined;
+    favs.hovered = on ? favs.hit(x, y, this.camera) : -1;
+    return favs.hovered;
+  }
+
+  /** What is on stage, for the DOM layer (social.ts): the exhibit being looked at, and whether the sky of favourites is up. */
+  stage = { work: -1, sky: false, skyIn: 0, scene: 'exterior' as 'exterior' | 'interior' | 'sky', local: 0, thrust: 0 };
+  /** Called when a star is clicked. */
+  onStar: (index: number) => void = () => {};
 
   click() {
     if (this.mode !== 'home' || !this.ui) return false;
@@ -235,7 +255,12 @@ export class World {
       return true;
     }
     const href = this.pickWork();
-    if (!href) return false;
+    if (!href) {
+      const star = this.hall?.favs.hovered ?? -1;
+      if (star < 0) return false;
+      this.onStar(star);
+      return true;
+    }
     this.onNavigate(href, false);
     return true;
   }
@@ -336,7 +361,13 @@ export class World {
         this.camPos.x += (Math.sin(t * 53) * 0.6 + Math.sin(t * 31 + 1) * 0.4) * 0.03 * s2;
         this.camPos.y += (Math.sin(t * 67 + 2) * 0.6 + Math.sin(t * 23) * 0.4) * 0.022 * s2;
       }
-      const k = scene === 'exterior' ? 0.09 : scene === 'interior' ? 0.25 : 0.2;
+      let k = scene === 'exterior' ? 0.09 : scene === 'interior' ? 0.25 : 0.2;
+      if (scene === 'interior') {
+        // looking up at the sky of favourites the view barely follows the pointer, so stars stay put to be hovered
+        const h = skyHold();
+        const up = THREE.MathUtils.smoothstep(local, h.from - 0.03, h.from) * (1 - THREE.MathUtils.smoothstep(local, h.to, h.to + 0.03));
+        k = THREE.MathUtils.lerp(k, 0.025, up);
+      }
       this.camPos.x += (Math.sin(t * 0.13) * 0.04 + this.pointerEased.x * k) * sway;
       this.camPos.y += (Math.sin(t * 0.17) * 0.03 + this.pointerEased.y * k * 0.5) * sway;
     }
@@ -383,11 +414,28 @@ export class World {
     this.castle?.setProgress(this.progress);
     this.castle?.update(this.light, t, innerHeight);
     this.hall?.update(t, dt, innerHeight);
-    if (this.hall) this.hall.works.setActive(inside && this.post.dim < 0.95 ? this.nearestWork() : -1);
+    const work = inside && this.post.dim < 0.95 ? this.nearestWork() : -1;
+    if (this.hall) {
+      this.hall.works.setActive(work);
+      // the piece in view leans a touch toward the pointer (still for reduced motion and on touch screens)
+      if (this.reduced || this.isMobile) this.hall.works.pointer.set(0, 0);
+      else this.hall.works.pointer.copy(this.pointerEased);
+    }
+    const hold = skyHold();
+    // the love button only while the camera is really at the piece, not walking to it
+    this.stage.work = work >= 0 ? this.nearestWork(0.016) : -1;
+    this.stage.sky = this.mode === 'home' && inside && local > hold.from && local < hold.to;
+    this.stage.skyIn = inside ? THREE.MathUtils.clamp((local - hold.from) / 0.03, 0, 1) * THREE.MathUtils.clamp((hold.to - local) / 0.02, 0, 1) : 0;
+    if (!this.stage.sky && this.hall) this.hall.favs.hovered = -1;
+    this.stage.scene = scene;
+    this.stage.local = local;
+    this.stage.thrust = Math.min(1, this.thrustEased);
     this.flight?.update(this.mode === 'home' && inSky, local, t, dt, this.pointerEased, this.camera, this.thrustEased);
     if (this.ui && this.mode === 'home') this.ui.update(this.progress, t, dt, this.intro);
 
     this.post.dim = blackout(this.progress);
+    const cl = cloudout(this.progress);
+    this.post.setCloud(cl.amount, cl.dawn);
     this.post.setVelocity(this.reduced ? 0 : this.velocity + this.thrustEased * 55);
     this.post.render(dt, t);
   }

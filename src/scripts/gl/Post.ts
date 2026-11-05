@@ -19,6 +19,8 @@ class FinishEffect extends Effect {
       /* glsl */ `
       uniform float wipe;
       uniform float dim;
+      uniform float cloud;
+      uniform float dawn;
       uniform float uTime;
       uniform vec3 wipeColor;
       float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -31,6 +33,15 @@ class FinishEffect extends Effect {
         vec3 c = inputColor.rgb * (1.0 - dim);
         float v = n(uv * 3.0 + uTime * 0.15) * 0.45 + n(uv * 8.0 - uTime * 0.2) * 0.2 + (1.0 - uv.y) * 0.35;
         float m = smoothstep(v - 0.12, v + 0.12, wipe * 1.3 - 0.15);
+        // rising through cloud: billows streaming down past the camera, moonlit blue below, dawn rose above
+        vec2 q = uv * vec2(1.0, 0.75);
+        float cv = n(q * 2.0 + vec2(0.0, uTime * 0.5)) * 0.5 + n(q * 4.3 + vec2(uTime * 0.04, uTime * 0.85)) * 0.3
+                 + n(q * 9.0 + vec2(0.0, uTime * 1.3)) * 0.2;
+        float lit = smoothstep(0.3, 0.75, cv); // billow tops catch the light, the folds between stay in shade
+        float cm = smoothstep(cv - 0.3, cv + 0.15, cloud * 1.45 - 0.3) * (0.9 + 0.1 * lit);
+        vec3 night = mix(vec3(0.09, 0.11, 0.17), vec3(0.5, 0.55, 0.68), lit);
+        vec3 day = mix(vec3(0.62, 0.5, 0.52), vec3(1.0, 0.9, 0.82), lit);
+        c = mix(c, mix(night, day, dawn), cm);
         outputColor = vec4(mix(c, wipeColor, m), inputColor.a);
       }`,
       {
@@ -38,6 +49,8 @@ class FinishEffect extends Effect {
         uniforms: new Map<string, THREE.Uniform>([
           ['wipe', new THREE.Uniform(0)],
           ['dim', new THREE.Uniform(0)],
+          ['cloud', new THREE.Uniform(0)],
+          ['dawn', new THREE.Uniform(0)],
           ['uTime', new THREE.Uniform(0)],
           ['wipeColor', new THREE.Uniform(new THREE.Color('#0c0e11'))],
         ]),
@@ -66,6 +79,11 @@ export class Post {
 
   set wipe(v: number) { this.finish.uniforms.get('wipe')!.value = v; }
   get wipe() { return this.finish.uniforms.get('wipe')!.value as number; }
+  /** the cloud the camera rises through between the hall and the sky (timeline.cloudout) */
+  setCloud(amount: number, dawn: number) {
+    this.finish.uniforms.get('cloud')!.value = amount;
+    this.finish.uniforms.get('dawn')!.value = dawn;
+  }
   set dim(v: number) { this.finish.uniforms.get('dim')!.value = v; }
   get dim() { return this.finish.uniforms.get('dim')!.value as number; }
 

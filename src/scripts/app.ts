@@ -6,6 +6,9 @@ import type { HomeData } from './gl/HomeUI';
 import { openBooking, warmBooking } from './booking';
 import { availabilityText } from '../lib/availability';
 import { hideLoader, loaderProgress, showLoader } from './loader';
+import { mountSocial } from './social';
+import { mountLovePage } from './love';
+import { sound, wireSound } from './sound';
 
 const html = document.documentElement;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -124,6 +127,8 @@ function mountGlow(mark: HTMLElement) {
 
 async function mountWidgets(container: HTMLElement) {
   container.querySelectorAll<HTMLElement>('[data-glow]').forEach((m) => unmount.push(mountGlow(m)));
+  // case studies: the same heart as in the hall
+  unmount.push(mountLovePage(container));
   // freelance availability follows today's date (the page itself is static)
   const avail = availabilityText();
   container.querySelectorAll<HTMLElement>('[data-availability]').forEach((el) => (el.textContent = avail));
@@ -256,6 +261,13 @@ async function enterPage(container: HTMLElement) {
     if (data)
       await Promise.race([w.buildHome(data), new Promise((r) => setTimeout(r, 4000))]).catch((err) => console.error('[gl] home build failed', err));
     w.setMode('home');
+    // candles, the sky of favourites and the picker (skipped if the visitor already left home while it loaded)
+    if (container.isConnected) unmount.push(mountSocial(container, w, lenis));
+    // the soundscape follows the walk (sound.ts); off home it falls silent
+    if (container.isConnected) {
+      sound.follow = () => w.stage;
+      unmount.push(() => (sound.follow = null));
+    }
     // camera intro starts as the curtain begins to lift, so the reveal reads as one move
     if (fresh) gsap.fromTo(w, { intro: 0 }, { intro: 1, duration: reduced ? 0.01 : 2.4, ease: 'expo.out', delay: reduced ? 0 : 0.9 });
     hideLoader();
@@ -322,6 +334,7 @@ addEventListener('pointermove', (e) => {
 addEventListener('click', (e) => {
   if (!world || world.mode !== 'home') return;
   if ((e.target as Element).closest('a, button')) return;
+  world.hoverCheck(e.clientX, e.clientY); // taps have no pointermove before them: aim at where the click landed
   if (world.click()) e.preventDefault();
 });
 
@@ -355,6 +368,7 @@ function webglSupported() {
 let homeScroll = 0;
 
 async function boot() {
+  wireSound();
   const container = document.querySelector<HTMLElement>('[data-barba="container"]')!;
   await enterPage(container);
   hideLoader();

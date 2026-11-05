@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-import { workStops } from './timeline';
+import { ARRIVAL, workStops } from './timeline';
 // Season Sans / Season Mix, served from /public/fonts (troika needs woff, not woff2)
 const fontLight = '/fonts/season-sans-300.woff';
 const fontRegular = '/fonts/season-sans-400.woff';
@@ -337,12 +337,12 @@ export class HomeUI {
       async (g, sec) => {
         if (!g.children.length) {
           this.add(g, { text: 'What I do', font: 'mono', size: 16, color: SUN, ax: 'center' });
-          this.add(g, { text: 'I build', font: 'light', size: 96 });
-          this.add(g, { text: 'sturdy', font: 'serif', size: 104, color: SUN });
-          this.add(g, { text: 'systems that', font: 'light', size: 96, ax: 'center' });
-          this.add(g, { text: 'hold up at scale.', font: 'light', size: 96, ax: 'center' });
+          this.add(g, { text: 'I build the', font: 'light', size: 96 });
+          this.add(g, { text: 'systems', font: 'serif', size: 104, color: SUN });
+          this.add(g, { text: 'behind the products', font: 'light', size: 96, ax: 'center' });
+          this.add(g, { text: 'people use.', font: 'light', size: 96, ax: 'center' });
           this.add(g, {
-            text: 'Backend and platform engineering: distributed services, event-driven pipelines and cloud infrastructure, from the first prototype to millions of requests.',
+            text: 'I focus on designing reliable architectures, engineering scalable backend systems and delivering full-stack applications that perform beyond the development environment.',
             font: 'regular', size: 16, color: ASH, ax: 'center', maxW: 460, lh: 1.4,
           });
           const ring = new THREE.Line(
@@ -363,7 +363,7 @@ export class HomeUI {
         const size = Math.min(this.vw * 0.085, 96);
         [l1a, l2, l3].forEach((t) => ((t.userData.spec as Spec).size = size));
         (l1b.userData.spec as Spec).size = size * 1.08;
-        (sub.userData.spec as Spec).maxW = Math.min(420, this.vw - 64);
+        (sub.userData.spec as Spec).maxW = Math.min(520, this.vw - 64);
         [fig, l2, l3, sub].forEach((t) => applySpec(t, this.px));
         const lineH = size * 1.0 * this.px;
         const top = lineH * 1.6;
@@ -389,7 +389,37 @@ export class HomeUI {
     const workCount = Math.min(stops.length, wallWork.length);
     const kinds = new Set(wallWork.map((p) => p.kind));
     const sub = `${kinds.size > 1 ? 'Full-stack and 3D web' : kinds.has('3d') ? '3D web' : 'Full-stack'} · ${workCount} projects`;
-    this.section('THE GREAT HALL', [0.295, 0.31, stops[workCount - 1] + 0.012, stops[workCount - 1] + 0.026], async (g, sec) => {
+    // 03a · Arrival: in through the door, the whole hall, and a word to whoever just walked in
+    const G = (local: number) => 0.27 + 0.44 * local;
+    this.section('THE ARRIVAL', [G(ARRIVAL.in - 0.02), G(ARRIVAL.in + 0.005), G(ARRIVAL.out - 0.005), G(ARRIVAL.out + 0.02)], async (g) => {
+      if (!g.children.length) {
+        this.add(g, { text: 'Everything in here\nwas built for someone.', font: 'light', size: 76, ax: 'center', ay: 'bottom', align: 'center', ls: -0.025, lh: 1.02 });
+        this.add(g, {
+          text: 'A founder with an idea, a team up against a deadline, a brand that wanted to be remembered. Walk on and meet a few of them.',
+          font: 'regular', size: 20, ax: 'center', ay: 'top', align: 'center', lh: 1.45, alpha: 0.86,
+        });
+      }
+      const [head, line] = g.children as Text[];
+      const mobile = this.vw < 760;
+      const size = Math.min(this.vw * (mobile ? 0.085 : 0.056), 78);
+      (head.userData.spec as Spec).size = size;
+      (head.userData.spec as Spec).maxW = Math.min(this.vw - 32, mobile ? 480 : 980);
+      (line.userData.spec as Spec).size = mobile ? 17 : 20;
+      (line.userData.spec as Spec).maxW = Math.min(this.vw - 48, 560);
+      for (const t of [head, line]) {
+        applySpec(t, this.px);
+        // a soft shadow, so the words hold over the candlelit nave
+        t.outlineBlur = '45%';
+        t.outlineWidth = 0;
+        t.outlineColor = '#050403';
+        t.userData.shadow = 0.55;
+      }
+      head.position.set(0, (mobile ? 40 : 30) * this.px, 0);
+      line.position.set(0, (mobile ? 16 : 6) * this.px, 0);
+      await Promise.all([head, line].map(syncP));
+    });
+
+    this.section('THE GREAT HALL', [G(ARRIVAL.out + 0.015), G(ARRIVAL.out + 0.035), stops[workCount - 1] + 0.012, stops[workCount - 1] + 0.026], async (g, sec) => {
       if (!g.children.length) {
         this.add(g, { text: 'Selected work', font: 'mono', size: 16, color: SUN });
         this.add(g, { text: sub, font: 'mono', size: 14, color: BONE, alpha: 0.75 });
@@ -421,15 +451,26 @@ export class HomeUI {
     // 06 · Climb
     this.section('THE CLOUD DECK', [0.735, 0.765, 0.8, 0.83], async (g) => {
       if (!g.children.length) {
-        this.add(g, { text: 'Then we take', font: 'light', size: 92 });
-        this.add(g, { text: 'off.', font: 'serif', size: 100, color: '#f3a77a' });
+        this.add(g, { text: "Next one's", font: 'light', size: 92 });
+        this.add(g, { text: 'yours.', font: 'serif', size: 100, color: '#f3a77a' });
+        // the bridge back to the hall ("Everything in here was built for someone") and on to the call below
+        this.add(g, {
+          text: 'Every project in that hall started as somebody’s idea. Bring yours, and we’ll build it to last.',
+          font: 'regular', size: 20, color: '#16181d', ax: 'center', ay: 'top', align: 'center', lh: 1.45,
+        });
       }
-      const [a, b] = g.children as Text[];
-      const size = Math.min(this.vw * 0.09, 104);
+      const [a, b, line] = g.children as Text[];
+      const mobile = this.vw < 760;
+      const size = Math.min(this.vw * (mobile ? 0.105 : 0.09), 104);
       (a.userData.spec as Spec).size = size;
       (b.userData.spec as Spec).size = size * 1.08;
+      (line.userData.spec as Spec).size = mobile ? 17 : 20;
+      (line.userData.spec as Spec).maxW = Math.min(this.vw - 48, 520);
+      applySpec(line, this.px); // dark ink on the bright dawn sky, like the finale's lines below it
       await this.inline([a, b], size * 0.22);
       a.position.y = b.position.y = size * 0.55 * this.px;
+      line.position.set(0, -(size * 0.42 + 30) * this.px, 0);
+      await syncP(line);
     });
 
     // 07 · Finale: CTA, then a footer row (email · elsewhere · pages) and credits
@@ -442,7 +483,7 @@ export class HomeUI {
         const btn = panel('#16181d', 1);
         btn.name = 'btn';
         g.add(btn);
-        named(this.add(g, { text: 'Get in touch  →', font: 'regular', size: 16, color: BONE, ax: 'center', ay: 'middle' }), 'btnLabel');
+        named(this.add(g, { text: 'Tell me about yours  →', font: 'regular', size: 16, color: BONE, ax: 'center', ay: 'middle' }), 'btnLabel');
         this.target(btn, '#book', sec); // opens the Cal.com booking popup
         // no footer: keep scrolling and the flight carries on to About (World.charge fills the bar)
         named(this.add(g, { text: 'Keep scrolling', font: 'mono', size: 14, color: '#2e2320', ax: 'center', ay: 'top', alpha: 0.8 }), 'more');
@@ -474,7 +515,7 @@ export class HomeUI {
       await this.inline([h1, h2], size * 0.24);
       h1.position.y = h2.position.y = top;
       avail.position.set(0, top - size * 1.06 * P, 0);
-      const bw = 220, bh = 52;
+      const bw = 236, bh = 52;
       const by = top - (size * 1.06 + 62) * P;
       btn.scale.set(bw * P, bh * P, 1);
       btn.position.set(0, by, 0);

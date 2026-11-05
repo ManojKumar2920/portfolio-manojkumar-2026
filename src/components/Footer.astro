@@ -38,14 +38,6 @@ const mark = 'Engineering with intent';
 
   <div class="ft-bottom">
     <span>© {year} {site.name}. Built in Chennai, India.</span>
-    <span class="ft-credits">
-      {(site.credits as readonly { label: string; license: string; href?: string }[]).map((c) =>
-        c.href ? (
-          <span>3D: <a href={c.href} target="_blank" rel="noopener">{c.label}</a> ({c.license})</span>
-        ) : (
-          <span>3D: {c.label} ({c.license})</span>
-        ),
-      )}
-    </span>
+    <a class="ft-credits" href="/credits">Credits &amp; licences</a>
   </div>
 </footer>

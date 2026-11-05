@@ -13,6 +13,7 @@ url: https://trycrux.in
 links:
   - { label: "trycrux.in", href: "https://trycrux.in" }
 media: { type: video, src: /media/works/crux.mp4, poster: /media/works/crux.jpg }
+wallMedia: { type: logo, src: /media/works/crux-logo.png, bg: "#105cf2", caption: "trycrux.in" }
 metrics:
   - { value: "10+", label: "tools replaced by one" }
   - { value: "24 h", label: "from sign-up to running" }

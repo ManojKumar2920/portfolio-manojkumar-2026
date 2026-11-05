@@ -1,0 +1,77 @@
+---
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../site';
+
+// Credits, in the profile page's language: each borrowed piece beside a still of where you meet it in the 3D world
+// on the home page, then the film data behind the sky of favourites, then what is owned by others.
+const pieces = site.credits;
+---
+
+<Base namespace="credits" title="Credits" description="The models, light and data the 3D world on this site is built with, where you meet each one, and their licences.">
+  <div class="page profile credits">
+    <div class="pf">
+      <header class="cr-hero">
+        <div class="cr-hero-text">
+          <h1 class="pf-name">Credits</h1>
+          <p class="pf-role" data-reveal>The world on the home page is hand-built around a few pieces made by other people. Here they are, where you meet them, and their licences.</p>
+        </div>
+        <nav class="cr-index" aria-label="Everything credited" data-reveal>
+          <ul>
+            {pieces.map((c, i) => (
+              <li><a href={`#piece-${i}`}><span>{c.label}</span><span class="cr-index-lic">{c.license}</span></a></li>
+            ))}
+            <li><a href="#cr-sky"><span>The Movie Database</span><span class="cr-index-lic">API terms</span></a></li>
+            <li><a href="#cr-owned"><span>Simple Icons</span><span class="cr-index-lic">CC0</span></a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <section class="cr-world" aria-labelledby="cr-world">
+        <h2 id="cr-world">In the 3D world</h2>
+        <div class="cr-pieces">
+          {pieces.map((c, i) => (
+            <article class="cr-piece" id={`piece-${i}`} data-reveal>
+              <figure class="cr-still">
+                <img src={c.image} alt={`Still from the home page: ${c.where.replace(/\.$/, '').toLowerCase()}`} width="1280" height="720" loading="lazy" decoding="async" />
+              </figure>
+              <div class="cr-text">
+                <h3>{c.label}</h3>
+                <p>{c.where}</p>
+                <p class="cr-meta">
+                  By {c.by} · {c.license}
+                </p>
+                <a class="pf-link" href={c.href} target="_blank" rel="noopener">See the original ↗</a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section class="cr-sky" aria-labelledby="cr-sky">
+        <figure class="cr-still cr-sky-still" data-reveal>
+          <img src="/images/credits/moon.jpg" alt="Still from the home page: the moon over the hall's open roof, where visitors' favourites shine as stars" width="1280" height="720" loading="lazy" decoding="async" />
+        </figure>
+        <div class="cr-text" data-reveal>
+          <h2 id="cr-sky">The sky of favourites</h2>
+          <p>At the end of the hall, every golden star round the moon is a visitor's favourite film or series. Their titles, years and posters come from The Movie Database.</p>
+          <a class="cr-tmdb" href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database (TMDB)">
+            <img src="/images/credits/tmdb.svg" alt="The Movie Database (TMDB)" width="489" height="35" />
+          </a>
+          <p class="cr-meta">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        </div>
+      </section>
+
+      <section class="cr-owned" aria-labelledby="cr-owned">
+        <div class="cr-text" data-reveal>
+          <h2 id="cr-owned">Logos and posters</h2>
+          <p>The film posters in the lightboxes in the hall belong to their studios and are shown as decoration. The technology logos on the profile and case studies come from <a class="pf-link" href="https://simpleicons.org/" target="_blank" rel="noopener">Simple Icons</a> (CC0); every brand name and logo belongs to its owner.</p>
+        </div>
+        <figure class="cr-still" data-reveal>
+          <img src="/images/credits/posters.jpg" alt="Still from the home page: four backlit poster lightboxes, Friends, Breaking Bad, Better Call Saul and The Avengers, under the words My favourites" width="1280" height="720" loading="lazy" decoding="async" />
+        </figure>
+      </section>
+    </div>
+    <div class="page-inner"><Footer /></div>
+  </div>
+</Base>

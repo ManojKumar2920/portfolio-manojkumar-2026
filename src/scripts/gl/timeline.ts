@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NOTE } from './landscape';
-import { workSpots } from './Hall';
+import { LIGHTBOX, posterZ, workSpots } from './Hall';
 import { exhibitSize } from './WorkPanels';
 
 /**
@@ -27,14 +27,26 @@ export function sceneAt(p: number) {
   return { scene: s.name, local };
 }
 
-/** 0 = clear, 1 = black. Peaks exactly on each boundary. */
+/** The hall → sky boundary is crossed in cloud, not in black: the camera rises out of the roof and through it. */
+const SKY_FROM = SCENES[2].from;
+/** the cloud starts only once the star hold is over (hall local 0.955 → 0.69 global) and clears soon after dawn */
+const CLOUD_IN = 0.018, CLOUD_OUT = 0.026;
+
+/** 0 = clear, 1 = black. Peaks exactly on each boundary (except into the sky, see cloudout). */
 export function blackout(p: number) {
   let b = 0;
-  for (const s of SCENES.slice(1)) {
+  for (const s of SCENES.slice(1, 2)) {
     const d = Math.abs(p - s.from);
     if (d < CUT) b = Math.max(b, 1 - d / CUT);
   }
   return b * b * (3 - 2 * b);
+}
+
+/** 0 = clear, 1 = all cloud, around the hall → sky boundary; and which side of it we are on (0 night, 1 dawn). */
+export function cloudout(p: number) {
+  const d = p - SKY_FROM;
+  const c = d < 0 ? Math.max(0, 1 + d / CLOUD_IN) : Math.max(0, 1 - d / CLOUD_OUT);
+  return { amount: c * c * (3 - 2 * c), dawn: p >= SKY_FROM ? 1 : 0 };
 }
 
 export interface CamKey {
@@ -67,11 +79,22 @@ export const EXTERIOR: CamKey[] = [
  */
 const hall = { count: 8, stacked: false };
 // the last hold ends well before the scene does, leaving a real walk down the nave and the look up through the roof
-const WORK_T0 = 0.08, WORK_END = 0.73;
+/** The arrival: through the door, then a held wide view of the nave while the welcome line is read (HomeUI). */
+export const ARRIVAL = { in: 0.04, out: 0.1 };
+const WORK_T0 = 0.14, WORK_END = 0.52;
 /** each exhibit's hold: longer when there are fewer of them, so every one gets a comfortable read */
-const holdT = () => THREE.MathUtils.clamp(0.28 / hall.count, 0.04, 0.08);
+const holdT = () => THREE.MathUtils.clamp(0.24 / hall.count, 0.035, 0.07);
 
 const workT = (i: number) => WORK_T0 + i * ((WORK_END - WORK_T0) / Math.max(1, hall.count - 1));
+/** After the work: the poster lightboxes (a stop of their own), then the sky of favourites, held to the end. */
+function endTimes() {
+  const tEnd = workT(workSpots(hall.count, hall.stacked).length - 1) + holdT();
+  const pz = posterZ(hall.count);
+  const pAt = tEnd + 0.105, pEnd = pAt + 0.06;
+  const skyAt = pz === null ? tEnd + 0.17 : pEnd + 0.08;
+  return { tEnd, pz, pAt, pEnd, skyAt };
+}
+const MOON: [number, number, number] = [-1.5, 16, -17.5]; // over the open roof (Hall's sky and moon model)
 
 function interiorKeys(aspect: number): CamKey[] {
   const spots = workSpots(hall.count, hall.stacked);
@@ -87,7 +110,11 @@ function interiorKeys(aspect: number): CamKey[] {
   };
   const key = (t: number, pos: [number, number, number], at: [number, number, number], flags: Partial<CamKey> = {}): CamKey => ({ t, pos, look: aim(pos, at), ...flags });
 
-  const keys: CamKey[] = [key(0.0, [0, 1.7, 13.5], [0, 1.9, 0])];
+  const keys: CamKey[] = [
+    key(0.0, [0, 1.75, 15.6], [0, 1.85, 0]), // on the threshold, the doorway still round the view
+    key(ARRIVAL.in, [0, 1.8, 12.4], [0, 2.6, -8], { stop: true }), // in: the whole nave, candles down both walls, moonlight
+    key(ARRIVAL.out, [0, 1.85, 11.6], [0, 2.75, -8], { stop: true }), // held, drifting in while the welcome is read
+  ];
   spots.forEach((sp, i) => {
     const t = workT(i);
     const c = sp.center;
@@ -104,20 +131,38 @@ function interiorKeys(aspect: number): CamKey[] {
     keys.push(key(t + holdT(), [c.x - sp.side * (d - 0.2), c.y - 0.38, c.z], at, { stop: true })); // slow push in
   });
   const last = spots[spots.length - 1];
-  const tEnd = workT(spots.length - 1) + holdT();
-  // the walk out: step back into the aisle, turn to the hearth and walk on, eyes lifting, to stand under the open
-  // stretch of roof and look straight up at the moon (Hall's night sky puts it over z ≈ −17.5)
-  const z2 = Math.min(-13, last.z - 2.5);
-  const z0 = last.z - 1.2;
-  const z1 = (z0 + z2) / 2;
-  const span = 1 - tEnd;
-  keys.push(
-    key(tEnd + span * 0.42, [-last.side * 0.2, 1.75, z0], [-3.2, 2.3, z0 - 6.2], { glide: true }), // turned down the nave, the film posters in view on the left
-    key(tEnd + span * 0.64, [0.05, 1.85, z1], [0.3, 6.8, -21.5], { glide: true }), // walking on, eyes lifting
-    key(tEnd + span * 0.92, [0.15, 2.0, z2], [1, 16, -17.5], { stop: true }), // up through the roof, to the moon
-    key(1.0, [0.15, 2.0, z2 - 0.1], [1, 16.5, -17.5], { stop: true }), // held while the scene fades
-  );
+  const { tEnd, pz, pAt, pEnd, skyAt } = endTimes();
+  if (pz !== null) {
+    // across the nave to the lightboxes on the left wall: a stop square on to the row, a slow push in
+    const dp = THREE.MathUtils.clamp(Math.max(2.5 / (0.8 * 2 * tanV), LIGHTBOX.w / (0.86 * 2 * tanV * aspect)), 3, 8.4);
+    const at: [number, number, number] = [-LIGHTBOX.wallX, LIGHTBOX.y + 0.05, pz];
+    const zm = (last.z + pz) / 2;
+    keys.push(
+      key((tEnd + pAt) / 2, [last.side > 0 ? 0.2 : -0.2, 1.9, zm], [-1.6, 2.1, zm - 6], { glide: true }),
+      key(pAt, [-LIGHTBOX.wallX + dp, 2.4, pz], at, { stop: true }),
+      key(pEnd, [-LIGHTBOX.wallX + dp - 0.2, 2.42, pz], at, { stop: true }),
+      // then the head lifts, up through the open roof to the moon and the sky of visitors' favourites
+      key(skyAt, [-0.3, 2.0, pz], MOON, { stop: true }),
+    );
+  } else {
+    const z2 = Math.min(-13, last.z - 2.5);
+    keys.push(
+      key((tEnd + skyAt) / 2, [0.05, 1.85, (last.z + z2) / 2], [0.3, 6.8, -21.5], { glide: true }),
+      key(skyAt, [-0.3, 2.0, z2], MOON, { stop: true }),
+    );
+  }
+  const hold = keys[keys.length - 1];
+  // then up: out through the open roof toward the moon, into the cloud the flight rises out of (cloudout, Post)
+  keys.push(key(0.955, [hold.pos[0], hold.pos[1], hold.pos[2] - 0.1], [MOON[0], MOON[1] + 0.5, MOON[2]], { stop: true })); // held under the stars
+  keys.push(key(1.0, [hold.pos[0] - 0.5, 11.5, hold.pos[2] - 1.2], [MOON[0], MOON[1] + 3, MOON[2] - 0.5]));
   return keys;
+}
+
+/** Interior-local span where the camera looks up at the sky of favourites (the last stop of the hall). */
+export function skyHold() {
+  const { pEnd, skyAt, pz, tEnd } = endTimes();
+  const from = pz === null ? tEnd : pEnd;
+  return { from: from + (skyAt - from) * 0.75, to: 0.955, at: skyAt };
 }
 
 /** Global scroll progress at the middle of each exhibit's hold (the HUD counter follows these). */

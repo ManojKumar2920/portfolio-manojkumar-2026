@@ -5,7 +5,7 @@ import { site } from '../site';
 interface Props {
   title?: string;
   description?: string;
-  namespace: 'home' | 'about' | 'work' | 'works' | 'notfound';
+  namespace: 'home' | 'about' | 'work' | 'works' | 'credits' | 'notfound';
 }
 const { title, description = site.pitch, namespace } = Astro.props;
 const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.role}`;
@@ -54,6 +54,10 @@ const links = [
       <a class="brand" href="/">{site.name}</a>
       <span class="clock" aria-hidden="true">{site.location.split(',')[0]} · <time data-clock>--:--</time> IST</span>
       <nav class="links">
+        <!-- the home page's soundscape (sound.ts): shown on home only -->
+        <button class="sound" type="button" data-sound aria-pressed="false" aria-label="Sound off. Turn sound on">
+          <span aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        </button>
         {links.map((l) => (
           <a href={l.href} aria-current={path === l.href || path.startsWith(`${l.href}/`) ? 'page' : undefined}>{l.label}</a>
         ))}

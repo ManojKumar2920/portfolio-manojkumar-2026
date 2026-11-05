@@ -403,6 +403,13 @@ interface Exhibit {
   video?: HTMLVideoElement;
   videoTex?: THREE.VideoTexture;
   hover: number;
+  /** 0–1: warms up while it is the piece in view */
+  lit: number;
+  /** the exhibit's group, and its resting rotation (it leans a touch toward the pointer while lit) */
+  g: THREE.Group;
+  rest: number;
+  side: number;
+  halos: { s: THREE.Sprite; base: number; phase: number }[];
 }
 
 export class WorkPanels {
@@ -410,7 +417,9 @@ export class WorkPanels {
   private exhibits: Exhibit[] = [];
   private flames: { s: THREE.Sprite; base: THREE.Vector2; phase: number }[] = [];
   private halos: { s: THREE.Sprite; base: number; phase: number }[] = [];
-  private lights: { light: THREE.PointLight; phase: number }[] = [];
+  private lights: { light: THREE.PointLight; phase: number; members: number[] }[] = [];
+  /** eased pointer, −1…1 (World) */
+  pointer = new THREE.Vector2();
   private active = -1;
   hovered = -1;
 
@@ -449,12 +458,15 @@ export class WorkPanels {
       this.group.add(s);
       this.flames.push({ s, base, phase: r() * 10 });
     };
+    let own: { s: THREE.Sprite; base: number; phase: number }[] = [];
     const addHalo = (p: THREE.Vector3, size: number) => {
-      const s = new THREE.Sprite(haloMat);
+      const s = new THREE.Sprite(haloMat.clone());
       s.position.copy(p);
       s.scale.setScalar(size);
       this.group.add(s);
-      this.halos.push({ s, base: size, phase: r() * 10 });
+      const h = { s, base: size, phase: r() * 10 };
+      this.halos.push(h);
+      own.push(h);
     };
     const candle = (x: number, y: number, z: number, rad: number, h: number) => {
       candles.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(rad, h, rad)));
@@ -464,9 +476,11 @@ export class WorkPanels {
     items.forEach((item, i) => {
       const spot = spots[i];
       if (!spot) return;
+      own = [];
       const s = spot.side;
       const g = new THREE.Group();
       g.position.copy(spot.center);
+      g.rotation.order = 'YXZ'; // the lean toward the pointer tilts about the exhibit's own axes
       g.rotation.y = s < 0 ? Math.PI / 2 : -Math.PI / 2; // face into the nave; local +x is the viewer's right
       this.group.add(g);
 
@@ -528,7 +542,8 @@ export class WorkPanels {
       }
       addHalo(new THREE.Vector3(inX(0.5), 0.4, spot.z), 1.6);
 
-      const ex: Exhibit = { item, pick, screen, placard, frameMat, hover: 0 };
+
+      const ex: Exhibit = { item, pick, screen, placard, frameMat, hover: 0, lit: 0, g, rest: g.rotation.y, side: s, halos: own };
       this.exhibits.push(ex);
       this.loadMedia(ex);
     });
@@ -540,7 +555,7 @@ export class WorkPanels {
       const light = new THREE.PointLight('#ffb070', 7, 9, 1.1);
       light.position.set(0, 2.5, zs.reduce((a, c) => a + c, 0) / zs.length);
       this.group.add(light);
-      this.lights.push({ light, phase: r() * 10 });
+      this.lights.push({ light, phase: r() * 10, members: used.flatMap((p, k) => (p.bay === b ? [k] : [])) });
     }
 
     const wicks = new THREE.InstancedMesh(candleGeo, wax, candles.length);
@@ -645,19 +660,46 @@ export class WorkPanels {
     return this.exhibits.length;
   }
 
+  /**
+   * A draught runs down the nave every so often: the flames it passes lean and gutter, their glow dips, then recovers.
+   * Returns 0–1 at hall-local z.
+   */
+  static draught(z: number, time: number) {
+    const period = 14;
+    const ph = (time % period) / period; // 0–1 along one pass
+    const front = 16 - ph * 46; // from the door (z 14) to past the hearth (z −22)
+    const d = z - front;
+    return ph < 0.85 ? Math.exp(-d * d * 0.18) : 0;
+  }
+
   update(time: number, dt: number) {
     for (const f of this.flames) {
-      const k = 1 + 0.12 * Math.sin(time * 13 + f.phase) + 0.07 * Math.sin(time * 29 + f.phase * 3);
-      f.s.scale.set(f.base.x * (1.9 - 0.9 * k), f.base.y * k, 1);
+      const gust = WorkPanels.draught(f.s.position.z, time);
+      const k = 1 + 0.12 * Math.sin(time * 13 + f.phase) + 0.07 * Math.sin(time * 29 + f.phase * 3) + gust * 0.35 * Math.sin(time * 41 + f.phase);
+      f.s.scale.set(f.base.x * (1.9 - 0.9 * k) * (1 + gust * 0.5), f.base.y * k * (1 - gust * 0.3), 1);
     }
-    for (const h of this.halos) h.s.scale.setScalar(h.base * (0.94 + 0.06 * Math.sin(time * 7 + h.phase)));
-    for (const l of this.lights) l.light.intensity = 7 * (0.92 + 0.06 * Math.sin(time * 9 + l.phase) + 0.02 * Math.sin(time * 23 + l.phase));
+    // the piece in view warms up: its screen brightens, its sconces bloom, its bay's light rises
     this.exhibits.forEach((ex, i) => {
       ex.hover = THREE.MathUtils.damp(ex.hover, this.hovered === i ? 1 : 0, 10, dt);
-      const c = 0.86 + ex.hover * 0.14;
+      ex.lit = THREE.MathUtils.damp(ex.lit, this.active === i ? 1 : 0, 2.2, dt);
+      const c = 0.74 + ex.lit * 0.14 + ex.hover * 0.12;
       ex.screen.color.setRGB(c, c * 0.98, c * 0.94);
-      ex.placard.emissiveIntensity = 0.3 + ex.hover * 0.15;
-      ex.frameMat.emissiveIntensity = 0.4 + ex.hover * 1.6;
+      ex.placard.emissiveIntensity = 0.22 + ex.lit * 0.12 + ex.hover * 0.15;
+      ex.frameMat.emissiveIntensity = 0.3 + ex.lit * 0.6 + ex.hover * 1.4;
+      for (const h of ex.halos) {
+        const gust = WorkPanels.draught(h.s.position.z, time);
+        h.s.scale.setScalar(h.base * (0.94 + 0.06 * Math.sin(time * 7 + h.phase)) * (0.9 + ex.lit * 0.3) * (1 - gust * 0.25));
+        h.s.material.opacity = 0.75 + ex.lit * 0.25;
+      }
+      // leans a little toward the pointer while it is the piece in view (never on phones: no pointer to follow)
+      const lean = ex.lit * 0.035;
+      ex.g.rotation.y = ex.rest + this.pointer.x * lean;
+      ex.g.rotation.x = -this.pointer.y * lean * 0.6;
     });
+    for (const l of this.lights) {
+      const lit = Math.max(0, ...l.members.map((k) => this.exhibits[k]?.lit ?? 0));
+      const gust = WorkPanels.draught(l.light.position.z, time);
+      l.light.intensity = (6 + lit * 3) * (0.92 + 0.06 * Math.sin(time * 9 + l.phase) + 0.02 * Math.sin(time * 23 + l.phase)) * (1 - gust * 0.22);
+    }
   }
 }

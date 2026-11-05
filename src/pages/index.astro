@@ -21,7 +21,7 @@ const homeData = {
     kind: p.data.kind,
     note: p.data.note,
     wall: p.data.wall,
-    media: p.data.media,
+    media: p.data.wallMedia ?? p.data.media,
   })),
 };
 ---
@@ -51,6 +51,59 @@ const homeData = {
       {site.credits.map((c) => <span> 3D model {c.label} ({c.license}).</span>)}
     </p>
   </div>
+
+  <!-- The shared layer over the 3D hall (social.ts): a heart per exhibit, the sky of visitors' favourites, and the picker. -->
+  <div class="social" data-social>
+    <button class="love" type="button" data-love hidden aria-pressed="false">
+      <svg class="love-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.6s-7.6-4.6-9.6-9.3C1 7.9 3.1 4.5 6.6 4.5c2.2 0 3.7 1.3 4.4 2.6h2c.7-1.3 2.2-2.6 4.4-2.6 3.5 0 5.6 3.4 4.2 6.8-2 4.7-9.6 9.3-9.6 9.3z" /></svg>
+      <span class="love-text" data-love-text>Love this project</span>
+      <span class="love-burst" data-love-burst aria-hidden="true"></span>
+    </button>
+    <div class="sky-cta" data-sky-cta hidden>
+      <p class="sky-cta-line">Every golden star up there is a visitor's favourite film or series.</p>
+      <p class="sky-hint" data-sky-hint><span class="sky-hint-star" aria-hidden="true"></span><span data-sky-hint-text>Hover a golden star to see whose favourite it is</span></p>
+      <button class="btn" type="button" data-fav-open>Add yours to the sky</button>
+    </div>
+    <div class="fav-tip" data-fav-tip hidden></div>
+    <p class="sky-live" data-sky-live role="status" aria-live="polite" hidden></p>
+  </div>
+
+  <dialog class="fav-dialog" data-fav-dialog aria-labelledby="fav-title" data-lenis-prevent>
+    <form method="dialog" class="fav-close-form"><button class="fav-close" aria-label="Close">Close</button></form>
+    <h2 id="fav-title" class="fav-title">Your favourite film or series</h2>
+    <p class="fav-lead">It joins the sky over the hall, where every visitor can see it.</p>
+
+    <div class="fav-step" data-fav-step="search">
+      <label class="fav-field">
+        <span>Search</span>
+        <input type="search" data-fav-q placeholder="Interstellar, Breaking Bad…" autocomplete="off" maxlength="80" />
+      </label>
+      <p class="fav-status" data-fav-status aria-live="polite"></p>
+      <ul class="fav-results" data-fav-results></ul>
+    </div>
+
+    <div class="fav-step" data-fav-step="confirm" hidden>
+      <div class="fav-chosen" data-fav-chosen></div>
+      <label class="fav-field">
+        <span>Your first name <em>(optional)</em></span>
+        <input type="text" data-fav-name maxlength="20" autocomplete="given-name" placeholder="Shown next to your star" />
+      </label>
+      <p class="fav-where" data-fav-where></p>
+      <div class="fav-turnstile" data-fav-turnstile></div>
+      <p class="fav-error" data-fav-error aria-live="assertive"></p>
+      <div class="fav-actions">
+        <button class="btn" type="button" data-fav-submit>Add to the sky</button>
+        <button class="fav-back" type="button" data-fav-back>Pick another</button>
+      </div>
+    </div>
+
+    <div class="fav-step" data-fav-step="done" hidden>
+      <p class="fav-done" data-fav-done></p>
+      <button class="btn" type="button" data-fav-finish>See it in the sky</button>
+    </div>
+
+    <p class="fav-credit">Search by <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+  </dialog>
 
   <script type="application/json" id="home-data" set:html={JSON.stringify(homeData)} />
 </Base>

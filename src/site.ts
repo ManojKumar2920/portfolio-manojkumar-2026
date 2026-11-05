@@ -8,7 +8,7 @@ export const site = {
   focus: 'Distributed systems & cloud backends',
   pitch: 'I design and run distributed systems, cloud backends and web platforms that hold up at scale.',
   // The exhibits on the home page's hall walls, in order (the rest of the work lives on /work and the profile page).
-  hallWork: ['moveit-india', 'blue-blues', 'cfoco', 'panchayat-voting'],
+  hallWork: ['moveit-india', 'panchayat-voting', 'crux', 'cfoco'],
   // From the resume: the profile page's opening paragraph.
   summary:
     'Software engineer with 2.5+ years of experience designing microservices, distributed systems and cloud-native applications across logistics, SaaS, eCommerce and consumer platforms. I lead engineering initiatives and ship products that handle millions of requests and high-concurrency workloads.',
@@ -18,6 +18,12 @@ export const site = {
   // Every "Let's talk" / "Get in touch" / "Contact" opens this Cal.com booking popup.
   booking: { link: 'manojkumar20/ship-now', namespace: 'ship-now', url: 'https://cal.com/manojkumar20/ship-now' },
   availability: 'Open to new opportunities',
+  // The shared side of the 3D world (candles on exhibits, visitors' favourites as stars): ../portfolio-server.
+  // Both values are public. The Turnstile site key pairs with the TURNSTILE_SECRET set on the Worker.
+  social: {
+    api: 'https://portfolio-server.manojkumararumainathan.workers.dev',
+    turnstileSiteKey: '0x4AAAAAAF0fvZHqZMeZeFuJ',
+  },
   location: 'Chennai, India · IST',
   socials: [
     { label: 'GitHub', href: 'https://github.com/ManojKumar2920' },
@@ -144,21 +150,31 @@ export const site = {
     { title: 'Fast by default', line: 'Performance budgets set on day one, not patched in later.' },
     { title: 'Shipped, not stalled', line: 'Small releases, clear updates, no surprises.' },
   ],
+  // Shown on /credits, each beside a still of where it appears in the 3D world (public/images/credits).
   credits: [
     {
-      label: '"Golden Gate Hills" HDRI by Poly Haven',
+      label: '"Golden Gate Hills" HDRI',
+      by: 'Poly Haven',
       license: 'CC0',
       href: 'https://polyhaven.com/a/golden_gate_hills',
+      where: 'The light and the sky over the hillside, where the walk begins.',
+      image: '/images/credits/hill.jpg',
     },
     {
-      label: 'Free Realistic Tree Asset Pack (CGTrader)', // TODO: add the author and confirm the licence from the CGTrader page
+      label: 'Free Realistic Tree Asset Pack',
+      by: 'CGTrader', // TODO: add the author's name from the CGTrader page
       license: 'Royalty Free License',
       href: 'https://www.cgtrader.com/free-3d-models/plant/leaf/free-realistic-tree-aset-pack',
+      where: 'The cherry trees round the ruin, petals and all.',
+      image: '/images/credits/orbit.jpg',
     },
     {
-      label: 'Airplane model', 
+      label: 'Airplane model',
+      by: 'Sketchfab', // TODO: the author's name (CC BY 4.0 asks for it): see https://skfb.ly/oT7t8
       license: 'CC BY 4.0',
       href: 'https://skfb.ly/oT7t8',
+      where: 'The flight above the clouds at the very end, on the way to About.',
+      image: '/images/credits/flight.jpg',
     },
   ],
 } as const;

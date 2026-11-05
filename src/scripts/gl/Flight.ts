@@ -134,14 +134,15 @@ export class Flight {
 
   /** local: progress through the sky scene (0–1). pointer: −1..1. thrust: 0–1, from scrolling past the end. */
   update(active: boolean, local: number, time: number, dt: number, pointer: THREE.Vector2, camera: THREE.Camera, thrust = 0) {
-    const show = active ? smooth(0.04, 0.16, local) : 0;
+    // the plane waits below the frame until "Next one's yours" has gone, then climbs in with "Let's take off" (HomeUI)
+    const show = active ? smooth(0.48, 0.53, local) : 0;
     this.group.visible = show > 0.001;
     if (!this.group.visible) {
       this.birdsReady = false;
       return;
     }
 
-    const rise = smooth(0.03, 0.35, local); // up from below the frame
+    const rise = smooth(0.48, 0.68, local); // up from below the frame
     const cam = camera.position;
     const shake = thrust * thrust;
     // Distance ahead: close and big; pushed back on narrow (portrait) screens so the wings still read.

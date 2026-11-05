@@ -89,7 +89,6 @@ const homeData = {
         <input type="text" data-fav-name maxlength="20" autocomplete="given-name" placeholder="Shown next to your star" />
       </label>
       <p class="fav-where" data-fav-where></p>
-      <div class="fav-turnstile" data-fav-turnstile></div>
       <p class="fav-error" data-fav-error aria-live="assertive"></p>
       <div class="fav-actions">
         <button class="btn" type="button" data-fav-submit>Add to the sky</button>
@@ -102,6 +101,8 @@ const homeData = {
       <button class="btn" type="button" data-fav-finish>See it in the sky</button>
     </div>
 
+    <!-- the spam check runs from the moment the picker opens; shown only if Cloudflare needs a click -->
+    <div class="fav-turnstile" data-fav-turnstile></div>
     <p class="fav-credit">Search by <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
   </dialog>
 

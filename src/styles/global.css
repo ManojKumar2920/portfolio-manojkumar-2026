@@ -721,7 +721,7 @@ html.js [data-reveal].in { opacity: 1; transform: none; }
 .fav-chosen { display: flex; gap: 18px; align-items: center; margin-bottom: 24px; }
 .fav-chosen img { width: 92px; height: 138px; object-fit: cover; border-radius: 8px; flex: none; }
 .fav-chosen strong { display: block; font: 400 26px/1.15 var(--serif); margin-bottom: 4px; }
-.fav-turnstile { margin-bottom: 8px; }
+.fav-turnstile { margin-top: 16px; }
 .fav-turnstile:empty { display: none; }
 .fav-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .fav-back { border: 0; background: none; color: var(--ash); font: 500 15px var(--display); cursor: pointer; padding: 8px 0; }

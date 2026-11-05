@@ -240,9 +240,41 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
   let searchAc: AbortController | null = null;
   let debounce = 0;
 
+  // The spam check (Turnstile) starts as soon as the picker opens, so it has finished long before "Add" is pressed.
+  // A press that still beats it waits for the token and then goes through: never an error and a second click.
+  let waiters: ((t: string) => void)[] = [];
+  const gotToken = (t: string) => {
+    token = t;
+    waiters.forEach((w) => w(t));
+    waiters = [];
+  };
+  const startCheck = async () => {
+    try {
+      await loadTurnstile();
+      if (!widget && window.turnstile) {
+        widget = window.turnstile.render(tsEl, {
+          sitekey: site.social.turnstileSiteKey,
+          theme: 'dark',
+          appearance: 'interaction-only',
+          callback: gotToken,
+          'expired-callback': () => (token = ''),
+          'error-callback': () => (token = ''),
+        });
+      }
+    } catch (err) {
+      errEl.textContent = (err as Error).message;
+    }
+  };
+  const waitToken = (ms = 20_000) =>
+    token
+      ? Promise.resolve(token)
+      : new Promise<string>((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error("The spam check didn't finish. Please try again.")), ms);
+          waiters.push((v) => (clearTimeout(t), resolve(v)));
+        });
   const resetTurnstile = () => {
     token = '';
-    if (widget && window.turnstile) window.turnstile.reset(widget);
+    if (widget && window.turnstile) window.turnstile.reset(widget); // a fresh token for the next one
   };
 
   const open = () => {
@@ -252,7 +284,7 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
     lenis.stop();
     q.focus();
     if (country === undefined) api<{ country: string | null }>('/api/whoami').then((d) => (country = d.country)).catch(() => (country = null));
-    loadTurnstile().catch(() => {});
+    startCheck();
   };
   container.querySelectorAll('[data-fav-open]').forEach((b) => on(b, 'click', open));
   on(dialog, 'close', () => {
@@ -307,21 +339,7 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
     whereEl.textContent = country ? `Shown as from ${regionName(country)}, detected from your connection.` : '';
     if (!country) errEl.textContent = "We couldn't detect your country, so the star can't be added from this connection.";
     submit.disabled = !country;
-    try {
-      await loadTurnstile();
-      if (!widget && window.turnstile) {
-        widget = window.turnstile.render(tsEl, {
-          sitekey: site.social.turnstileSiteKey,
-          theme: 'dark',
-          appearance: 'interaction-only',
-          callback: (t: string) => (token = t),
-          'expired-callback': () => (token = ''),
-          'error-callback': () => (token = ''),
-        });
-      }
-    } catch (err) {
-      errEl.textContent = (err as Error).message;
-    }
+    startCheck(); // already running since the picker opened; this only covers a failed first load
   });
   on($('[data-fav-back]', dialog), 'click', () => {
     show('search');
@@ -330,17 +348,16 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
 
   on(submit, 'click', async () => {
     if (!chosen || !country) return;
-    if (!token) {
-      errEl.textContent = 'One moment: the spam check is still running.';
-      return;
-    }
     submit.disabled = true;
     errEl.textContent = '';
+    const label = submit.textContent;
     try {
+      if (!token) submit.textContent = 'Adding…';
+      const turnstile = await waitToken();
       const d = await api<{ star: FavStar }>('/api/picks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'screen', id: chosen.id, firstName: nameIn.value.trim() || undefined, turnstile: token }),
+        body: JSON.stringify({ kind: 'screen', id: chosen.id, firstName: nameIn.value.trim() || undefined, turnstile }),
       });
       mine.add(d.star.ref);
       try {
@@ -356,6 +373,7 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
       errEl.textContent = (err as Error).message;
     } finally {
       submit.disabled = false;
+      submit.textContent = label;
       resetTurnstile();
     }
   });

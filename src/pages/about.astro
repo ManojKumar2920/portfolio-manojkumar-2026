@@ -138,7 +138,7 @@ const availability = availabilityText(); // build-time default; the browser re-c
         <header class="pf-hero">
           <div class="pf-hero-text">
             <h1 class="pf-name">{site.name}</h1>
-            <p class="pf-role" data-reveal>Software engineer in Chennai, building distributed systems, cloud backends and 3D web experiences.</p>
+            <p class="pf-role" data-reveal>Software engineer in India, building distributed systems, cloud backends and 3D web experiences.</p>
             <p class="pf-body" data-reveal>{site.summary}</p>
             <p class="status" data-reveal><i></i>Open to full-time roles</p>
             <div class="pf-actions" data-reveal>
@@ -163,7 +163,7 @@ const availability = availabilityText(); // build-time default; the browser re-c
           <h2>Experience</h2>
           <article class="pf-job" data-reveal>
             <h3>{job.role}, {job.org}</h3>
-            <p class="pf-meta">{job.period} · {job.place}, India</p>
+            <p class="pf-meta">{job.period} · {job.place}</p>
             <ul>{job.points.map((pt) => <li set:html={bold(pt)} />)}</ul>
           </article>
         </section>

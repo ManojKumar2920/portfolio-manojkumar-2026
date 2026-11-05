@@ -216,7 +216,7 @@ export class Note {
         g.fillStyle = ink;
         g.font = '400 28px "Season Sans", "Helvetica Neue", Arial, sans-serif';
         g.globalAlpha = 0.75;
-        g.fillText(`No. 01 · ${site.location.split(',')[0]}`, P, P + 10);
+        g.fillText(`No. 01 · ${site.location.split(' · ')[0]}`, P, P + 10);
         g.textAlign = 'right';
         g.fillText(String(new Date().getFullYear()), Wpx - P, P + 10);
         g.textAlign = 'left';

@@ -2,7 +2,7 @@ import { site } from './site';
 
 /**
  * Who this site is about, as schema.org data (JSON-LD), so search engines and AI answer engines can tell this
- * Manoj Kumar apart from the others: a software engineer in Chennai, with his profiles, employer and education.
+ * Manoj Kumar apart from the others: a software engineer in India, with his profiles, employer and education.
  * Every page carries the Person and the WebSite; pages add their own node (a profile page, a case study).
  */
 
@@ -22,7 +22,7 @@ export const person = {
   image: `${ORIGIN}/images/manoj-profile.jpg`,
   email: `mailto:${site.email}`,
   sameAs: site.socials.map((s) => s.href),
-  address: { '@type': 'PostalAddress', addressLocality: 'Chennai', addressRegion: 'Tamil Nadu', addressCountry: 'IN' },
+  address: { '@type': 'PostalAddress', addressCountry: 'IN' },
   worksFor: site.experience[0] ? { '@type': 'Organization', name: site.experience[0].org } : undefined,
   alumniOf: { '@type': 'CollegeOrUniversity', name: site.education.school },
   knowsAbout: [

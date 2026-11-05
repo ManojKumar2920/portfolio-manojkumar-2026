@@ -24,7 +24,7 @@ export const site = {
     api: 'https://portfolio-server.manojkumararumainathan.workers.dev',
     turnstileSiteKey: '0x4AAAAAAF0fvZHqZMeZeFuJ',
   },
-  location: 'Chennai, India · IST',
+  location: 'India · IST',
   socials: [
     { label: 'GitHub', href: 'https://github.com/ManojKumar2920' },
     { label: 'LinkedIn', href: 'https://www.linkedin.com/in/manojkumar20' },
@@ -41,7 +41,7 @@ export const site = {
     {
       role: 'Software Engineer',
       org: 'TIC Global Services',
-      place: 'Chennai',
+      place: 'India',
       period: 'Jul 2024 – present',
       line: 'Lead engineering across logistics, SaaS, analytics and eCommerce products; architected MoveIt India (20+ microservices) and delivered 40+ client apps and sites.',
       points: [

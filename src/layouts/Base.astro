@@ -15,7 +15,7 @@ interface Props {
   type?: string;
 }
 const { title, description = site.pitch, namespace, image = '/og.jpg', schema = [], type = 'website' } = Astro.props;
-const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.role} in Chennai`;
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.role} in India`;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const canonical = new URL(path, ORIGIN).href;
 const imageUrl = new URL(image, ORIGIN).href;
@@ -98,7 +98,7 @@ const links = [
 
     <header class="nav" aria-label="Primary">
       <a class="brand" href="/">{site.name}</a>
-      <span class="clock" aria-hidden="true">{site.location.split(',')[0]} · <time data-clock>--:--</time> IST</span>
+      <span class="clock" aria-hidden="true">{site.location.split(' · ')[0]} · <time data-clock>--:--</time> IST</span>
       <nav class="links">
         <!-- the home page's soundscape (sound.ts): shown on home only -->
         <button class="sound" type="button" data-sound aria-pressed="false" aria-label="Sound off. Turn sound on">

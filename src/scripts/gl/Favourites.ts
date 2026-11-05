@@ -23,6 +23,10 @@ const MAX = 400;
 /** where the camera stands at the end of the walk, and the moon it looks at (hall-local; see timeline, Hall sky) */
 const EYE = new THREE.Vector3(-0.3, 2.0, -15.2);
 const MOON = new THREE.Vector3(-1.5, 16, -17.5);
+/** the hold looks from the moon to just over it (timeline: MOON → MOON + 0.5 up); stars are laid out from midway */
+const LOOK = MOON.clone().add(new THREE.Vector3(0, 0.25, 0));
+const Y = new THREE.Vector3(0, 1, 0);
+const m4 = new THREE.Matrix4();
 
 function hash(n: number) {
   let x = (n | 0) ^ 0x9e3779b9;
@@ -95,7 +99,7 @@ export class FavSky {
           // stays small; the gold lives in the halo and the glint, so the colour survives additive blending
           float glow = (halo + glint * (0.7 + vHot + vFlare)) * vTw;
           vec3 gold = mix(vec3(1.0, 0.68, 0.3), vec3(1.0, 0.5, 0.22), clamp(vHot + vFlare, 0.0, 1.0));
-          vec3 col = gold * glow * 1.4 + vec3(1.0, 0.93, 0.8) * core * vTw;
+          vec3 col = gold * glow * 1.8 + vec3(1.0, 0.86, 0.6) * core * vTw;
           gl_FragColor = vec4(col, 1.0);
         }`,
     });
@@ -140,19 +144,42 @@ export class FavSky {
     return this.picks.findIndex((p) => p.ref === ref);
   }
 
+  /** The lens the sky is seen through at the hold: stars are laid out to fill that view, so a new lens re-lays them. */
+  private lens = { tanV: Math.tan(THREE.MathUtils.degToRad(19)), aspect: 1.6 };
+  frame(fovDeg: number, aspect: number) {
+    const tanV = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2));
+    if (Math.abs(tanV - this.lens.tanV) < 1e-4 && Math.abs(aspect - this.lens.aspect) < 1e-3) return;
+    this.lens = { tanV, aspect };
+    this.picks.forEach((p, i) => {
+      const born = this.born[i];
+      this.place(i, p, born);
+    });
+    this.flush();
+  }
+
   private place(i: number, p: FavStar, born: number) {
-    // a direction round the moon: wide across the view, shallower up and down, never on the moon itself
+    // A spot on the screen of the hold view (the camera at EYE looking up at the moon), in that camera's own axes:
+    // looking straight up the camera is rolled, so world left/right would land the stars on a diagonal. u, v are
+    // fractions of the half-width and half-height: across the whole width, from the nav down to just above the
+    // invitation at the foot, never on the moon. Hashed from the title, so a star keeps its place between visits.
     const id = strHash(p.ref);
-    const a = hash(id * 7 + 1), b = hash(id * 13 + 5), c = hash(id * 31 + 9);
-    const ang = a * Math.PI * 2;
-    const r = 0.12 + Math.sqrt(b) * 0.48;
-    const fwd = this.v.copy(MOON).sub(EYE).normalize();
-    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 0, -1)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
-    const dir = fwd.clone().addScaledVector(right, Math.cos(ang) * r * 1.05).addScaledVector(up, Math.sin(ang) * r * 0.42).normalize();
+    const { tanV, aspect } = this.lens;
+    let u = 0, v = 0;
+    for (let k = 0; k < 12; k++) {
+      u = (hash(id * 7 + 1 + k * 101) * 2 - 1) * 0.9;
+      v = -0.3 + hash(id * 13 + 5 + k * 103) * 1.12; // −0.3 … 0.82
+      const dx = u * aspect, moon = Math.hypot(dx, v + 0.05);
+      if (moon > 0.34) break;
+    }
+    const c = hash(id * 31 + 9);
+    m4.lookAt(EYE, LOOK, Y);
+    const right = this.v.setFromMatrixColumn(m4, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(m4, 1);
+    const fwd = new THREE.Vector3().setFromMatrixColumn(m4, 2).negate();
+    const dir = fwd.addScaledVector(right, u * tanV * aspect).addScaledVector(up, v * tanV).normalize();
     const dist = 11 + c * 3;
     this.pos.set([EYE.x + dir.x * dist, EYE.y + dir.y * dist, EYE.z + dir.z * dist], i * 3);
-    this.size[i] = 0.9 + Math.min(2.2, Math.log2(p.count) * 0.4) + c * 0.3;
+    this.size[i] = 1.7 + Math.min(2.2, Math.log2(p.count) * 0.45) + c * 0.3;
     this.seed[i] = hash(id * 3 + 2);
     this.mineA[i] = this.mine.has(p.ref) ? 1 : 0;
     this.born[i] = born;
@@ -163,10 +190,13 @@ export class FavSky {
     this.geo.setDrawRange(0, this.picks.length);
   }
 
-  /** The star nearest the pointer (within ~22 px), or −1. */
+  /** how near (CSS px) the pointer must come to a star: wider for a fingertip */
+  reach = 22;
+
+  /** The star nearest the pointer (within reach), or −1. */
   hit(clientX: number, clientY: number, camera: THREE.Camera) {
     if (!this.points.visible || !this.picks.length) return -1;
-    let best = -1, bd = 22 * 22;
+    let best = -1, bd = this.reach * this.reach;
     for (let i = 0; i < this.picks.length; i++) {
       const s = this.screen(i, camera);
       if (!s) continue;

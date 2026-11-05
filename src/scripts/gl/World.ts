@@ -140,6 +140,8 @@ export class World {
     setHall(items.length, stacked);
     this.fitScroll(items.length);
     this.hall = new Hall(items, this.isMobile, stacked);
+    this.hall.favs.frame(this.camera.fov, this.camera.aspect);
+    if (matchMedia('(pointer: coarse)').matches) this.hall.favs.reach = 36;
     if (this.moonGltf) this.hall.setMoon(this.moonGltf);
     this.scene.add(this.hall.group);
     await this.hall.works.paint();
@@ -272,6 +274,7 @@ export class World {
     this.camera.fov = w < h ? 52 : 38;
     this.camera.updateProjectionMatrix();
     fitInterior(w / h);
+    this.hall?.favs.frame(this.camera.fov, w / h);
     this.renderer.setSize(w, h, false);
     this.post.setSize(w, h);
     this.ui?.layout(w, h);

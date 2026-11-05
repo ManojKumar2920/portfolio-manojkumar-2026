@@ -29,14 +29,39 @@ gsap.ticker.add((time, deltaMs) => {
 
 /* ---------- top bar ---------- */
 // live local time (the site's location is IST)
-const clock = document.querySelector<HTMLElement>('[data-clock]');
+const clocks = document.querySelectorAll<HTMLElement>('[data-clock]');
 const fmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
-const tickClock = () => clock && (clock.textContent = fmt.format(new Date()));
+const tickClock = () => clocks.forEach((c) => (c.textContent = fmt.format(new Date())));
 tickClock();
 setInterval(tickClock, 15_000);
 
+/* ---------- phones: the menu sheet ---------- */
+const menu = document.querySelector<HTMLElement>('[data-menu]')!;
+const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]')!;
+let menuOpen = false;
+function setMenu(open: boolean) {
+  if (open === menuOpen) return;
+  menuOpen = open;
+  menuBtn.setAttribute('aria-expanded', String(open));
+  menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  document.documentElement.classList.toggle('menu-open', open);
+  if (open) {
+    menu.hidden = false;
+    requestAnimationFrame(() => menu.classList.add('is-open'));
+    lenis.stop();
+  } else {
+    menu.classList.remove('is-open');
+    setTimeout(() => !menuOpen && (menu.hidden = true), 360);
+    lenis.start();
+  }
+}
+menuBtn.addEventListener('click', () => setMenu(!menuOpen));
+menu.addEventListener('click', (e) => (e.target as Element).closest('a') && setMenu(false));
+addEventListener('keydown', (e) => e.key === 'Escape' && menuOpen && (setMenu(false), menuBtn.focus()));
+matchMedia('(min-width: 761px)').addEventListener('change', (e) => e.matches && setMenu(false));
+
 function syncNav(path: string) {
-  document.querySelectorAll<HTMLAnchorElement>('.nav .links a:not([data-book])').forEach((a) => {
+  document.querySelectorAll<HTMLAnchorElement>('.nav .links a:not([data-book]), .menu-links a:not([data-book])').forEach((a) => {
     const href = a.getAttribute('href') || '';
     const p = path.replace(/\/$/, '') || '/';
     const here = href === p || (href !== '/' && p.startsWith(`${href}/`));
@@ -333,7 +358,7 @@ addEventListener('pointermove', (e) => {
 });
 addEventListener('click', (e) => {
   if (!world || world.mode !== 'home') return;
-  if ((e.target as Element).closest('a, button')) return;
+  if (menuOpen || (e.target as Element).closest('a, button')) return;
   world.hoverCheck(e.clientX, e.clientY); // taps have no pointermove before them: aim at where the click landed
   if (world.click()) e.preventDefault();
 });
@@ -395,6 +420,7 @@ async function boot() {
           if (title) document.title = title;
           lenis.scrollTo(0, { immediate: true, force: true });
           await enterPage(next.container);
+          syncNav(next.url.path); // the address bar may not have moved yet: mark the page barba is going to
           lenis.resize();
           if (next.namespace === 'home' && homeScroll > 0) lenis.scrollTo(homeScroll, { immediate: true, force: true });
           lenis.start();

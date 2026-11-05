@@ -139,16 +139,14 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
     live.classList.remove('is-out');
     liveUntil = now + 5200;
   };
-  // touch screens: the first tap on a star shows its card, a second tap on the same star opens it
+  // touch screens have no hover: a tap on a star only opens its card (with a link to the title inside it), a tap on
+  // empty sky closes it. Nothing leaves the page unless the link itself is tapped. With a mouse, hover shows the card
+  // and a click opens the title.
   const coarse = matchMedia('(pointer: coarse)').matches;
-  let tapped = -1;
+  tip.classList.toggle('is-touch', coarse);
   world.onStar = (i) => {
     const p = favs?.picks[i];
-    if (!p) return;
-    if (coarse && tapped !== i) {
-      tapped = i;
-      return;
-    }
+    if (!p || coarse) return;
     window.open(tmdbUrl(p.ref), '_blank', 'noopener');
   };
   const hint = $('[data-sky-hint]');
@@ -169,7 +167,7 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
         ? `Picked by ${p.count.toLocaleString('en')} visitors · latest ${latest}`
         : p.firstName ? `${esc(p.firstName)} · ${esc(regionName(p.country))}` : `A visitor from ${esc(regionName(p.country))}`;
     tip.innerHTML = `${p.poster ? `<img src="${esc(p.poster)}" alt="" width="46" height="69" />` : ''}
-      <span class="fav-tip-text"><strong>${esc(p.title)}</strong>${p.year ? ` <span class="fav-tip-year">${esc(p.year)}</span>` : ''}<span class="fav-tip-who">${who}</span></span>`;
+      <span class="fav-tip-text"><strong>${esc(p.title)}</strong>${p.year ? ` <span class="fav-tip-year">${esc(p.year)}</span>` : ''}<span class="fav-tip-who">${who}</span>${coarse ? `<a class="fav-tip-open" href="${tmdbUrl(p.ref)}" target="_blank" rel="noopener">See it on TMDB ↗</a>` : ''}</span>`;
   };
 
   /* ---------- per frame: follow the stage ---------- */
@@ -211,7 +209,11 @@ export function mountSocial(container: HTMLElement, world: World, lenis: Lenis) 
     }
     if (hov >= 0) {
       const s = favs!.screen(hov, world.camera);
-      if (s) tip.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y)}px)`;
+      // beside the star, kept inside the screen (the card is up to 300 px wide, stars reach the right edge)
+      if (s) {
+        const x = Math.min(s.x, innerWidth - tip.offsetWidth - 28), y = Math.min(s.y, innerHeight - tip.offsetHeight - 28);
+        tip.style.transform = `translate(${Math.round(Math.max(0, x))}px, ${Math.round(Math.max(0, y))}px)`;
+      }
     }
   };
   raf = requestAnimationFrame(frame);

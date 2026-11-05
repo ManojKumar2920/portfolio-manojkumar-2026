@@ -46,6 +46,10 @@ export function posterZ(count: number): number | null {
 }
 /** The lightbox row: its size and the poster set (see the lightboxes in Hall). */
 export const LIGHTBOX = { y: 2.78, h: 1.42, w: 5.05, wallX: W / 2 - 0.04 };
+/** On phones (stacked) the four lightboxes hang as a 2 × 2 grid: a row of four is too wide for a portrait screen. */
+export const LIGHTBOX_GRID = { h: 1.2, rowStep: 1.95 };
+/** The whole lightbox group, plates and headline included, for the camera to frame (timeline). */
+export const lightboxSize = (stacked: boolean) => (stacked ? { w: 2.25, h: 4.2 } : { w: LIGHTBOX.w, h: 2.5 });
 
 let SPOTS: WorkSpot[] = [];
 let SPOT_HALF = 2.4; // half the exhibit's length along the wall
@@ -535,7 +539,8 @@ export class Hall {
           vec2 m = vec2(-1.5, -7.5);
           float d = length(vP - m);
           vec3 col = mix(vec3(0.07, 0.1, 0.19), vec3(0.015, 0.02, 0.045), smoothstep(0.0, 40.0, d));
-          col += stars(vP, 0.55, 0.93) * 0.9 + stars(vP + 17.0, 0.25, 0.9) * 0.45;
+          // the painted stars stay few, faint and cold: the bright, warm ones are the visitors' (Favourites.ts)
+          col += (stars(vP, 0.55, 0.965) * 0.42 + stars(vP + 17.0, 0.25, 0.95) * 0.16) * vec3(0.72, 0.8, 1.0);
           // thin moonlit cloud
           float c = n(vP * 0.12 + vec2(uTime * 0.01, 0.0)) * n(vP * 0.31 - vec2(0.0, uTime * 0.008));
           col = mix(col, vec3(0.32, 0.36, 0.48), smoothstep(0.25, 0.6, c) * 0.35 * exp(-d * 0.06));
@@ -825,9 +830,16 @@ export class Hall {
         { src: '/media/posters/better-call-saul.jpg', aspect: 776 / 1100, title: 'Better Call Saul', year: '2015' },
         { src: '/media/posters/avengers.jpg', aspect: 734 / 1100, title: 'The Avengers', year: '2012' },
       ];
-      const H = LIGHTBOX.h, B = 0.06, D = 0.09, GAP = 0.24;
+      const grid = stacked; // phones: 2 × 2
+      const cols = grid ? 2 : films.length;
+      const H = grid ? LIGHTBOX_GRID.h : LIGHTBOX.h, B = 0.06, D = 0.09, GAP = grid ? 0.22 : 0.24;
       const widths = films.map((f) => H * f.aspect);
-      const total = widths.reduce((a, b) => a + b, 0) + films.length * B * 2 + GAP * (films.length - 1);
+      // each row is centred on its own; in the grid the two rows sit half a step above and below the row's centre
+      const rowWidth = (r: number) => {
+        const ws = widths.slice(r * cols, r * cols + cols);
+        return ws.reduce((a, b) => a + b, 0) + ws.length * B * 2 + GAP * (ws.length - 1);
+      };
+      const rowY = (r: number) => (grid ? (r === 0 ? 1 : -1) * LIGHTBOX_GRID.rowStep / 2 : 0);
       const row = new THREE.Group();
       row.position.set(-LIGHTBOX.wallX, LIGHTBOX.y, posterBay);
       row.rotation.y = Math.PI / 2; // face into the nave from the left wall; local +x runs toward −z
@@ -857,10 +869,12 @@ export class Hall {
       hg.fillRect(0, 0, 64, 256);
       const glassMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sheen), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       this.plates = [];
-      let x = -total / 2;
+      let x = 0;
       films.forEach((f, k) => {
+        const r = Math.floor(k / cols);
+        if (k % cols === 0) x = -rowWidth(r) / 2;
         const w = widths[k];
-        const cx = x + B + w / 2;
+        const cx = x + B + w / 2, cy = rowY(r);
         // the case: a slim metal box, its face a frame round the lit poster
         const shell = new THREE.Shape();
         shell.moveTo(-w / 2 - B, -H / 2 - B);
@@ -874,9 +888,9 @@ export class Hall {
         hole.lineTo(w / 2, -H / 2);
         shell.holes.push(hole);
         const face = new THREE.Mesh(new THREE.ExtrudeGeometry(shell, { depth: D, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 1 }), caseMat);
-        face.position.x = cx;
+        face.position.set(cx, cy, 0);
         const box = new THREE.Mesh(new THREE.BoxGeometry(w + B * 2, H + B * 2, 0.02), caseMat);
-        box.position.set(cx, 0, 0.01);
+        box.position.set(cx, cy, 0.01);
         // the poster, lit from behind: unlit, a touch over white so it glows in the dark nave
         const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.12, 1.1, 1.06), toneMapped: false });
         loader.load(f.src, (t) => {
@@ -886,11 +900,11 @@ export class Hall {
           mat.needsUpdate = true;
         });
         const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, H), mat);
-        pic.position.set(cx, 0, D - 0.02);
+        pic.position.set(cx, cy, D - 0.02);
         const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glassMat);
-        glass.position.set(cx, 0, D + 0.005);
+        glass.position.set(cx, cy, D + 0.005);
         const glow = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.1, H * 1.7), spillMat);
-        glow.position.set(cx, 0, 0.004);
+        glow.position.set(cx, cy, 0.004);
         row.add(glow, box, face, pic, glass);
         // a brass plate under each: the title and the year
         const plateW = Math.min(w, 0.86), plateH = 0.19;
@@ -901,7 +915,7 @@ export class Hall {
         ptex.colorSpace = THREE.SRGBColorSpace;
         ptex.anisotropy = 8;
         const plate = new THREE.Mesh(new THREE.BoxGeometry(plateW, plateH, 0.012), [brass, brass, brass, brass, new THREE.MeshBasicMaterial({ map: ptex }), brass]); // enamel face, unlit so it reads in the dark
-        plate.position.set(cx, -H / 2 - B - 0.2, 0.014);
+        plate.position.set(cx, cy - H / 2 - B - 0.2, 0.014);
         row.add(plate);
         this.plates.push({ canvas: pc, tex: ptex, title: f.title, year: f.year });
         x += w + B * 2 + GAP;
@@ -913,7 +927,7 @@ export class Hall {
       const htex = new THREE.CanvasTexture(head);
       htex.colorSpace = THREE.SRGBColorSpace;
       const headPlate = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.225), new THREE.MeshBasicMaterial({ map: htex, transparent: true, depthWrite: false }));
-      headPlate.position.set(0, H / 2 + B + 0.24, 0.02);
+      headPlate.position.set(0, rowY(0) + H / 2 + B + 0.24, 0.02);
       row.add(headPlate);
       this.plates.push({ canvas: head, tex: htex, title: 'My favourites', year: '', heading: true });
       // the light the boxes throw into the nave

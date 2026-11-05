@@ -108,8 +108,25 @@ const links = [
           <a href={l.href} aria-current={path === l.href || path.startsWith(`${l.href}/`) ? 'page' : undefined}>{l.label}</a>
         ))}
         <a class="talk" href={site.booking.url} data-book>Get in touch <span aria-hidden="true">→</span></a>
+        <!-- phones: About and Work move into the sheet below -->
+        <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-controls="menu" aria-label="Open menu">
+          <span aria-hidden="true"><i></i><i></i></span>
+        </button>
       </nav>
     </header>
+
+    <div class="menu" id="menu" data-menu hidden>
+      <nav class="menu-links" aria-label="Menu">
+        <a href="/">Home</a>
+        {links.map((l) => <a href={l.href}>{l.label}</a>)}
+        <a href={site.booking.url} data-book>Get in touch</a>
+      </nav>
+      <div class="menu-foot">
+        <a href={`mailto:${site.email}`}>{site.email}</a>
+        <p>{site.socials.map((s) => <a href={s.href} target="_blank" rel="noopener">{s.label}</a>)}</p>
+        <p class="menu-where">{site.location.split(' · ')[0]} · <time data-clock>--:--</time> IST</p>
+      </div>
+    </div>
 
     <div class="grain" aria-hidden="true"></div>
 

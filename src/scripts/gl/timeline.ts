@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NOTE } from './landscape';
-import { LIGHTBOX, posterZ, workSpots } from './Hall';
+import { LIGHTBOX, lightboxSize, posterZ, workSpots } from './Hall';
 import { exhibitSize } from './WorkPanels';
 
 /**
@@ -134,7 +134,8 @@ function interiorKeys(aspect: number): CamKey[] {
   const { tEnd, pz, pAt, pEnd, skyAt } = endTimes();
   if (pz !== null) {
     // across the nave to the lightboxes on the left wall: a stop square on to the row, a slow push in
-    const dp = THREE.MathUtils.clamp(Math.max(2.5 / (0.8 * 2 * tanV), LIGHTBOX.w / (0.86 * 2 * tanV * aspect)), 3, 8.4);
+    const lb = lightboxSize(hall.stacked);
+    const dp = THREE.MathUtils.clamp(Math.max(lb.h / (0.8 * 2 * tanV), lb.w / (0.86 * 2 * tanV * aspect)), 3, 8.4);
     const at: [number, number, number] = [-LIGHTBOX.wallX, LIGHTBOX.y + 0.05, pz];
     const zm = (last.z + pz) / 2;
     keys.push(

@@ -7,12 +7,32 @@ import { site } from '../site';
  */
 
 const API = site.social.api;
+
+/**
+ * This browser's visitor id (random, kept in localStorage), sent as X-Visitor. The server keys loves by it, not by
+ * the IP: one IP is often a whole home, office or mobile carrier, and they must not share one heart.
+ */
+function visitorId() {
+  const KEY = 'mk.visitor';
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+      id = crypto.randomUUID();
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    return (memo ??= crypto.randomUUID()); // storage blocked: one id for this visit
+  }
+}
+let memo: string | undefined;
+const headers = () => ({ 'X-Visitor': visitorId() });
 const state = { counts: {} as Record<string, number>, mine: new Set<string>(), ready: false, busy: false };
 let loading: Promise<boolean> | null = null;
 
 /** Load the counts (once; again only after a failure). Resolves true when they are in. */
 export function loadLoves() {
-  loading ??= fetch(API + '/api/loves')
+  loading ??= fetch(API + '/api/loves', { headers: headers() })
     .then((r) => (r.ok ? r.json() : Promise.reject()))
     .then((d: { counts: Record<string, number>; mine: string[] }) => {
       state.counts = d.counts;
@@ -67,7 +87,7 @@ export async function giveLove(els: LoveEls, slug: string | undefined, repaint: 
   state.counts[slug] = (state.counts[slug] ?? 0) + 1;
   repaint();
   try {
-    const r = await fetch(`${API}/api/loves/${slug}`, { method: 'POST' });
+    const r = await fetch(`${API}/api/loves/${slug}`, { method: 'POST', headers: headers() });
     if (!r.ok) throw new Error();
     state.counts[slug] = ((await r.json()) as { count: number }).count;
   } catch {

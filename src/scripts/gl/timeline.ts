@@ -66,9 +66,10 @@ export const EXTERIOR: CamKey[] = [
  * is read; then on to the hearth and up through the open roof.
  */
 const hall = { count: 8, stacked: false };
-const WORK_T0 = 0.08, WORK_END = 0.84;
+// the last hold ends well before the scene does, leaving a real walk down the nave and the look up through the roof
+const WORK_T0 = 0.08, WORK_END = 0.73;
 /** each exhibit's hold: longer when there are fewer of them, so every one gets a comfortable read */
-const holdT = () => THREE.MathUtils.clamp(0.36 / hall.count, 0.045, 0.1);
+const holdT = () => THREE.MathUtils.clamp(0.28 / hall.count, 0.04, 0.08);
 
 const workT = (i: number) => WORK_T0 + i * ((WORK_END - WORK_T0) / Math.max(1, hall.count - 1));
 
@@ -91,20 +92,30 @@ function interiorKeys(aspect: number): CamKey[] {
     const t = workT(i);
     const c = sp.center;
     const at: [number, number, number] = [c.x, c.y - 0.05, c.z];
-    if (i > 0) {
-      // between exhibits: step back into the aisle and walk on, looking down the nave, turning toward the next one
+    if (i > 0 && spots[i - 1].side !== sp.side) {
+      // across the nave: step back into the aisle and walk on, looking down the nave, turning toward the next one
       const prev = spots[i - 1];
       const zm = (prev.z + sp.z) / 2;
       const tm = (workT(i - 1) + holdT() + t) / 2;
       keys.push(key(tm, [-sp.side * 0.15, 1.85, zm], [sp.side * 1.6, 1.95, zm - 6], { glide: true }));
     }
+    // along the same wall there is no mid key: the camera trucks sideways from one piece to the next, still facing the wall
     keys.push(key(t, [c.x - sp.side * d, c.y - 0.4, c.z], at, { stop: true }));
     keys.push(key(t + holdT(), [c.x - sp.side * (d - 0.2), c.y - 0.38, c.z], at, { stop: true })); // slow push in
   });
   const last = spots[spots.length - 1];
+  const tEnd = workT(spots.length - 1) + holdT();
+  // the walk out: step back into the aisle, turn to the hearth and walk on, eyes lifting, to stand under the open
+  // stretch of roof and look straight up at the moon (Hall's night sky puts it over z ≈ −17.5)
+  const z2 = Math.min(-13, last.z - 2.5);
+  const z0 = last.z - 1.2;
+  const z1 = (z0 + z2) / 2;
+  const span = 1 - tEnd;
   keys.push(
-    key(0.93, [-last.side * 0.1, 1.7, last.z - 1.5], [0, 1.6, -21.5], { glide: true }), // turn to the hearth
-    key(1.0, [0.2, 1.5, last.z - 3.2], [0.6, 7.5, -17.6]), // and up through the open roof
+    key(tEnd + span * 0.42, [-last.side * 0.2, 1.75, z0], [-3.2, 2.3, z0 - 6.2], { glide: true }), // turned down the nave, the film posters in view on the left
+    key(tEnd + span * 0.64, [0.05, 1.85, z1], [0.3, 6.8, -21.5], { glide: true }), // walking on, eyes lifting
+    key(tEnd + span * 0.92, [0.15, 2.0, z2], [1, 16, -17.5], { stop: true }), // up through the roof, to the moon
+    key(1.0, [0.15, 2.0, z2 - 0.1], [1, 16.5, -17.5], { stop: true }), // held while the scene fades
   );
   return keys;
 }
@@ -139,11 +150,20 @@ export function setHall(count: number, stacked: boolean) {
 
 const m1 = new THREE.Vector3(), m2 = new THREE.Vector3();
 /** Catmull–Rom (Hermite form) between pts[i] and pts[i + 1]; keys flagged stop get a zero tangent. */
-function catmull(pts: THREE.Vector3[], keys: CamKey[], i: number, t: number, out: THREE.Vector3) {
+/** monotone: a component that changes direction at a key gets a flat tangent there, so it never overshoots */
+const limit = (m: number, d0: number, d1: number) => (d0 * d1 <= 0 ? 0 : Math.sign(m) * Math.min(Math.abs(m), 3 * Math.min(Math.abs(d0), Math.abs(d1))));
+const flatten = (m: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+  m.set(limit(m.x, b.x - a.x, c.x - b.x), limit(m.y, b.y - a.y, c.y - b.y), limit(m.z, b.z - a.z, c.z - b.z));
+};
+function catmull(pts: THREE.Vector3[], keys: CamKey[], i: number, t: number, out: THREE.Vector3, monotone = false) {
   const n = pts.length;
   const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[Math.min(n - 1, i + 1)], p3 = pts[Math.min(n - 1, i + 2)];
   m1.subVectors(p2, p0).multiplyScalar(keys[i].stop ? 0 : 0.5);
   m2.subVectors(p3, p1).multiplyScalar(keys[Math.min(n - 1, i + 1)].stop ? 0 : 0.5);
+  if (monotone) {
+    flatten(m1, p0, p1, p2);
+    flatten(m2, p1, p2, p3);
+  }
   const t2 = t * t, t3 = t2 * t;
   return out
     .set(0, 0, 0)
@@ -153,10 +173,24 @@ function catmull(pts: THREE.Vector3[], keys: CamKey[], i: number, t: number, out
     .addScaledVector(m2, t3 - t2);
 }
 
-const cache = new Map<SceneName, { pos: THREE.Vector3[]; look: THREE.Vector3[] }>();
+/** Each key's view direction as (yaw, pitch), yaw unwrapped so consecutive keys never turn the long way round. */
+function headings(k: CamKey[]) {
+  let prev = 0;
+  return k.map((x, i) => {
+    const d = new THREE.Vector3(x.look[0] - x.pos[0], x.look[1] - x.pos[1], x.look[2] - x.pos[2]).normalize();
+    let yaw = Math.atan2(d.x, -d.z);
+    if (i > 0) while (yaw - prev > Math.PI) yaw -= Math.PI * 2;
+    if (i > 0) while (yaw - prev < -Math.PI) yaw += Math.PI * 2;
+    prev = yaw;
+    return new THREE.Vector3(yaw, Math.asin(THREE.MathUtils.clamp(d.y, -1, 1)), 0);
+  });
+}
+
+const ang = new THREE.Vector3();
+const cache = new Map<SceneName, { pos: THREE.Vector3[]; look: THREE.Vector3[]; head: THREE.Vector3[] }>();
 export function sampleCamera(scene: SceneName, t: number, pos: THREE.Vector3, look: THREE.Vector3) {
   const k = KEYS[scene];
-  if (!cache.has(scene)) cache.set(scene, { pos: k.map((x) => new THREE.Vector3(...x.pos)), look: k.map((x) => new THREE.Vector3(...x.look)) });
+  if (!cache.has(scene)) cache.set(scene, { pos: k.map((x) => new THREE.Vector3(...x.pos)), look: k.map((x) => new THREE.Vector3(...x.look)), head: headings(k) });
   const c = cache.get(scene)!;
   let i = 0;
   while (i < k.length - 2 && t > k[i + 1].t) i++;
@@ -165,7 +199,12 @@ export function sampleCamera(scene: SceneName, t: number, pos: THREE.Vector3, lo
   const g0 = !!k[i].glide, g1 = !!k[i + 1].glide;
   const e = g0 && g1 ? u : g0 ? u * 0.4 + (1 - (1 - u) * (1 - u)) * 0.6 : g1 ? u * 0.4 + u * u * 0.6 : u * u * (3 - 2 * u) * 0.6 + u * 0.4;
   catmull(c.pos, k, i, e, pos);
-  catmull(c.look, k, i, e, look);
+  if (scene === 'interior') {
+    // indoors the view turns by angle, not by sliding a look point: an even, head-like turn between the walls
+    catmull(c.head, k, i, e, ang, true);
+    const cp = Math.cos(ang.y);
+    look.set(pos.x + Math.sin(ang.x) * cp * 4, pos.y + Math.sin(ang.y) * 4, pos.z - Math.cos(ang.x) * cp * 4);
+  } else catmull(c.look, k, i, e, look);
 }
 
 /* ---------------- lighting ---------------- */

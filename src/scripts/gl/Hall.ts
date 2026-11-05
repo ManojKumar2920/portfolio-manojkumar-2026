@@ -19,14 +19,20 @@ const BAY_Z = [7.2, 1.6, -4, -9.6, -15.2];
 const BROKEN_COLS = new Set([3, 8]); // indices into the column list that have fallen
 
 /**
- * Where the work hangs: two exhibits to a bay, facing each other across the nave, left then right, from the
- * entrance toward the hearth (see WorkPanels, timeline). Each pair is nudged apart along the nave so the walk keeps
- * moving forward as it turns from one wall to the other.
+ * Where the work hangs (see WorkPanels, timeline), from the entrance toward the hearth. Up to one exhibit per bay,
+ * in runs of two on the same wall (left, left, right, right…): the camera trucks along a wall from one to the next
+ * and turns across the nave only once per run, while walking. More than five pieces fall back to two per bay,
+ * facing each other across the nave.
  */
 export const HALL_WALL_X = W / 2;
 export function workSpots(count: number, stacked: boolean): WorkSpot[] {
   const cy = stacked ? 2.65 : 2.55;
+  const spread = count <= BAY_Z.length;
   return Array.from({ length: Math.min(count, BAY_Z.length * 2) }, (_, i) => {
+    if (spread) {
+      const side = Math.floor(i / 2) % 2 ? 1 : -1;
+      return { side, z: BAY_Z[i], bay: i, center: new THREE.Vector3(side * (W / 2 - 0.05), cy, BAY_Z[i]) };
+    }
     const bay = Math.floor(i / 2), side = i % 2 ? 1 : -1;
     const z = BAY_Z[bay] + (i % 2 ? -0.4 : 0.4);
     return { side, z, bay, center: new THREE.Vector3(side * (W / 2 - 0.05), cy, z) };
@@ -576,10 +582,10 @@ export class Hall {
     const timber = new THREE.MeshStandardMaterial({ color: '#3b2a1e', roughness: 1 });
     const rafter = new THREE.BoxGeometry(W + 0.6, 0.28, 0.32);
     [11.5, 8, 3, -2.5, -8.5, -14, -19.5].forEach((z, i) => {
-      if (i === 3) return; // gone
+      if (i === 3 || i === 5) return; // gone (the open stretch the camera looks up through at the end)
       const b = new THREE.Mesh(rafter, timber);
       b.position.set(0, H - 0.3, z);
-      if (i === 5) {
+      if (i === 4) {
         // snapped, leaning against the left wall with its foot among the pews (clear of the camera's walk)
         b.scale.x = 0.62;
         b.position.set(-3.05, 2.6, z);

@@ -60,8 +60,15 @@ export interface CamKey {
 }
 
 /** Ruin: ~3.1 wide, tower ~2.1 tall, floor at y = 0, on a hilltop falling away on every side (see Ruin.groundAt). */
+/** hero: low on the slope, the ruin on the crest, half the frame sky, the two front cherries framing it */
+const HERO_WIDE: CamKey = { t: 0.0, pos: [0.45, -0.05, 6.9], look: [0.25, 0.25, 0] };
+/**
+ * A portrait screen sees only ±13° across: from there the cherries (x −1.9 and +2.7) fall outside the frame. Phones
+ * stand further down the slope, and their two front cherries stand a little inward (Ruin), one at each edge.
+ */
+const HERO_TALL: CamKey = { t: 0.0, pos: [0.4, -0.7, 9.6], look: [0.1, 0.7, 0] };
 export const EXTERIOR: CamKey[] = [
-  { t: 0.0, pos: [0.45, -0.05, 6.9], look: [0.25, 0.25, 0] }, // hero: low on the slope, the ruin on the crest, half the frame sky
+  { ...HERO_WIDE },
   // down the path to the old note lying on it (Note.ts), then a slow push in while it is read
   { t: 0.13, pos: [NOTE.x + 0.04, NOTE.y + 0.92, NOTE.z + 0.58], look: [NOTE.x, NOTE.y, NOTE.z - 0.02], stop: true },
   { t: 0.31, pos: [NOTE.x + 0.03, NOTE.y + 0.8, NOTE.z + 0.48], look: [NOTE.x, NOTE.y, NOTE.z - 0.02], stop: true },
@@ -184,6 +191,11 @@ let lastAspect = 16 / 9;
 /** Refit the hall's stops to the viewport (narrow phones stand further back from the exhibits). */
 export function fitInterior(aspect: number) {
   lastAspect = aspect;
+  const hero = aspect < 0.8 ? HERO_TALL : HERO_WIDE;
+  if (KEYS.exterior[0].pos !== hero.pos) {
+    KEYS.exterior[0] = { ...hero };
+    cache.delete('exterior');
+  }
   KEYS.interior = interiorKeys(aspect);
   cache.delete('interior');
 }

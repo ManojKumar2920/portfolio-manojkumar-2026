@@ -76,6 +76,8 @@ export class Ruin {
   private stoneMap: THREE.Texture | null = null;
   private petals: Petals | null = null;
   private fillTrees: THREE.Object3D[] = [];
+  /** a portrait screen at load (the hero view is narrow: see HERO_TALL in timeline) */
+  private tall = innerWidth / innerHeight < 0.8;
   private garden: Garden | null = null;
   /** blossom points on the front trees' outer canopy (birds feed here) */
   private blossoms: Blossom[] = [];
@@ -205,8 +207,9 @@ export class Ruin {
     const hFar = far === near ? hNear : height(far);
 
     const spots: { x: number; z: number; h: number; hero: boolean }[] = [
-      { x: -1.9, z: 2.3, h: 2.5, hero: true }, // big, front left
-      { x: 2.7, z: 1.7, h: 2.0, hero: true }, // front right
+      // big, front left and front right; on a portrait screen a little inward, so each half-frames one edge
+      { x: this.tall ? -1.35 : -1.9, z: this.tall ? 2.6 : 2.3, h: 2.5, hero: true },
+      { x: this.tall ? 1.95 : 2.7, z: this.tall ? 2.2 : 1.7, h: 2.0, hero: true },
       { x: 2.9, z: -1.0, h: 1.8, hero: true }, // behind the tower
     ];
 

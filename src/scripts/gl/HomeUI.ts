@@ -360,21 +360,48 @@ export class HomeUI {
         }
         const [fig, l1a, l1b, l2, l3, sub] = g.children as Text[];
         const ring = g.children[6] as THREE.Line;
-        const size = Math.min(this.vw * 0.085, 96);
+        // phones: one phrase per line, so the type can be big (on one line "behind the products" caps it at ~33 px)
+        const mobile = this.vw < 760;
+        const size = mobile ? Math.min(this.vw * 0.105, 48) : Math.min(this.vw * 0.085, 96);
         [l1a, l2, l3].forEach((t) => ((t.userData.spec as Spec).size = size));
         (l1b.userData.spec as Spec).size = size * 1.08;
-        (sub.userData.spec as Spec).maxW = Math.min(520, this.vw - 64);
+        (l2.userData.spec as Spec).text = mobile ? 'behind the\nproducts' : 'behind the products';
+        (l2.userData.spec as Spec).lh = mobile ? 1.1 : 1.0;
+        (l1a.userData.spec as Spec).ax = mobile ? 'center' : 'left';
+        const subSpec = sub.userData.spec as Spec;
+        subSpec.maxW = mobile ? Math.min(286, this.vw - 56) : Math.min(520, this.vw - 64);
+        subSpec.size = mobile ? 14 : 16;
+        subSpec.lh = mobile ? 1.5 : 1.4;
+        subSpec.ls = mobile ? -0.005 : undefined; // small text: no tight tracking
+        subSpec.color = mobile ? BONE : ASH;
+        sub.userData.alpha = mobile ? 0.72 : 1;
         [fig, l2, l3, sub].forEach((t) => applySpec(t, this.px));
-        const lineH = size * 1.0 * this.px;
-        const top = lineH * 1.6;
+        const lineH = size * (mobile ? 1.1 : 1.0) * this.px;
+        const rows = mobile ? 5 : 3; // heading lines under the label
+        const top = lineH * (mobile ? 2.4 : 1.6);
         fig.position.set(0, top + 44 * this.px, 0);
-        const ws = await this.inline([l1a, l1b], size * 0.22);
-        l1a.position.y = l1b.position.y = top;
-        l2.position.set(0, top - lineH, 0);
-        l3.position.set(0, top - lineH * 2, 0);
-        sub.position.set(0, top - lineH * 3 - 18 * this.px, 0);
+        let ws: number[];
+        let ringY: number;
+        if (mobile) {
+          applySpec(l1a, this.px);
+          l1a.position.set(0, top, 0);
+          ws = await this.inline([l1b], 0);
+          ws.unshift(0);
+          l1b.position.y = top - lineH;
+          l2.position.set(0, top - lineH * 2, 0);
+          l3.position.set(0, top - lineH * 4, 0);
+          ringY = top - lineH * 1.5;
+          await syncP(l1a);
+        } else {
+          ws = await this.inline([l1a, l1b], size * 0.22);
+          l1a.position.y = l1b.position.y = top;
+          l2.position.set(0, top - lineH, 0);
+          l3.position.set(0, top - lineH * 2, 0);
+          ringY = top - lineH * 0.5;
+        }
+        sub.position.set(0, top - lineH * rows - (mobile ? 22 : 18) * this.px, 0);
         await Promise.all([fig, l2, l3, sub].map(syncP));
-        ring.position.set(l1b.position.x + ws[1] / 2, top - lineH * 0.5, 0);
+        ring.position.set(l1b.position.x + ws[1] / 2, ringY, 0);
         ring.scale.set(ws[1] / 2 + 18 * this.px, lineH * 0.55, 1);
         sec.update = (local) => {
           const n = Math.floor(THREE.MathUtils.clamp((local - 0.15) / 0.4, 0, 1) * 97);
@@ -455,8 +482,8 @@ export class HomeUI {
         this.add(g, { text: 'yours.', font: 'serif', size: 100, color: '#f3a77a' });
         // the bridge back to the hall ("Everything in here was built for someone") and on to the call below
         this.add(g, {
-          text: 'Every project in that hall started as somebody’s idea. Bring yours, and we’ll build it to last.',
-          font: 'regular', size: 20, color: '#16181d', ax: 'center', ay: 'top', align: 'center', lh: 1.45,
+          text: 'Every project in that hall started as somebody’s idea. Bring yours, and i’ll build it to last.',
+          font: 'regular', size: 20, ax: 'center', ay: 'top', align: 'center', lh: 1.45,
         });
       }
       const [a, b, line] = g.children as Text[];

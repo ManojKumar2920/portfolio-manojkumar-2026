@@ -17,6 +17,8 @@ const W = 9, H = 7.5, Z0 = 14, Z1 = -22, L = Z0 - Z1;
 const COL_X = 3.3;
 const COL_Z = [10, 4.4, -1.2, -6.8, -12.4, -18];
 const BAY_Z = [7.2, 1.6, -4, -9.6, -15.2];
+/** how many pictures there are for the gilt frames (public/media/hall/1.jpg …) */
+const HALL_PICTURES = 5;
 const BROKEN_COLS = new Set([3, 8]); // indices into the column list that have fallen
 
 /**
@@ -254,212 +256,6 @@ function floorTexture() {
     g.fill();
   }
   return tex(c);
-}
-
-/**
- * Old oil paintings, all on one atlas (4 × 3 cells): landscapes, a sea, a portrait, a still life, the ruin itself.
- * Brush texture, yellowed varnish, craquelure and a dark vignette make them read as old canvases in low light.
- */
-const ATLAS_COLS = 4, ATLAS_ROWS = 3, CELL_W = 384, CELL_H = 480;
-function paintingAtlas() {
-  const c = document.createElement('canvas');
-  c.width = CELL_W * ATLAS_COLS;
-  c.height = CELL_H * ATLAS_ROWS;
-  const ctx = c.getContext('2d')!;
-  const kinds = ['landscape', 'portrait', 'sea', 'ruin', 'still', 'landscape', 'portrait', 'sea', 'still', 'ruin', 'landscape', 'portrait'];
-  kinds.forEach((kind, i) => {
-    const r = rand(101 + i * 17);
-    const ox = (i % ATLAS_COLS) * CELL_W, oy = Math.floor(i / ATLAS_COLS) * CELL_H;
-    const w = CELL_W, h = CELL_H;
-    ctx.save();
-    ctx.translate(ox, oy);
-    ctx.beginPath();
-    ctx.rect(0, 0, w, h);
-    ctx.clip();
-    const grad = (y0: number, y1: number, stops: string[]) => {
-      const g = ctx.createLinearGradient(0, y0, 0, y1);
-      stops.forEach((col, k) => g.addColorStop(k / (stops.length - 1), col));
-      return g;
-    };
-    const ridge = (base: number, amp: number, col: string, freq: number) => {
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.moveTo(0, h);
-      const p1 = r() * 6, p2 = r() * 6;
-      for (let x = 0; x <= w; x += 6) ctx.lineTo(x, base - amp * (0.5 + 0.35 * Math.sin(x * freq + p1) + 0.15 * Math.sin(x * freq * 3.1 + p2)));
-      ctx.lineTo(w, h);
-      ctx.fill();
-    };
-    if (kind === 'landscape') {
-      const warm = r() > 0.5;
-      ctx.fillStyle = grad(0, h * 0.62, warm ? ['#5b6e86', '#c7a36e', '#e8c58a'] : ['#33475e', '#7d8fa0', '#c9c3a6']);
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = warm ? 'rgba(255,226,160,0.85)' : 'rgba(240,236,214,0.7)';
-      ctx.beginPath();
-      ctx.arc(w * (0.25 + r() * 0.5), h * 0.42, 18 + r() * 10, 0, Math.PI * 2);
-      ctx.fill();
-      ridge(h * 0.58, 90, warm ? '#7c7a86' : '#56616e', 0.012);
-      ridge(h * 0.66, 60, warm ? '#4e5a48' : '#3c4a40', 0.02);
-      ridge(h * 0.78, 40, warm ? '#3a4128' : '#2a3424', 0.03);
-      ctx.fillStyle = grad(h * 0.78, h, ['#4c4a26', '#2a2814']);
-      ctx.fillRect(0, h * 0.8, w, h * 0.2);
-      // a lone tree
-      const tx = w * (0.15 + r() * 0.7);
-      ctx.fillStyle = '#1e2214';
-      ctx.fillRect(tx - 3, h * 0.66, 6, h * 0.16);
-      ctx.beginPath();
-      ctx.ellipse(tx, h * 0.62, 30, 38, 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (kind === 'sea') {
-      ctx.fillStyle = grad(0, h * 0.55, ['#1f2a3c', '#5d6a7a', '#b7ab8e']);
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = grad(h * 0.55, h, ['#3e5562', '#1b2a33', '#0e161c']);
-      ctx.fillRect(0, h * 0.55, w, h * 0.45);
-      for (let k = 0; k < 160; k++) {
-        const y = h * 0.56 + Math.pow(r(), 1.6) * h * 0.44;
-        ctx.strokeStyle = `rgba(${200 + r() * 40},${200 + r() * 30},${180},${0.08 + r() * 0.2})`;
-        ctx.lineWidth = 1 + (y / h) * 3;
-        ctx.beginPath();
-        const x = r() * w;
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + 10 + r() * 40, y + (r() - 0.5) * 2);
-        ctx.stroke();
-      }
-      // a sail on the horizon
-      ctx.fillStyle = '#d8cdb0';
-      const sx = w * (0.3 + r() * 0.4);
-      ctx.beginPath();
-      ctx.moveTo(sx, h * 0.47);
-      ctx.lineTo(sx + 14, h * 0.545);
-      ctx.lineTo(sx - 8, h * 0.545);
-      ctx.fill();
-    } else if (kind === 'portrait') {
-      const bg = ['#2a2418', '#1c2224', '#30201a'][Math.floor(r() * 3)];
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
-      const lg = ctx.createRadialGradient(w * 0.4, h * 0.3, 10, w * 0.5, h * 0.4, w * 0.8);
-      lg.addColorStop(0, 'rgba(120,96,60,0.55)');
-      lg.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = lg;
-      ctx.fillRect(0, 0, w, h);
-      // shoulders and dark coat
-      ctx.fillStyle = ['#15130f', '#2a1a14', '#1a2026'][Math.floor(r() * 3)];
-      ctx.beginPath();
-      ctx.ellipse(w * 0.5, h * 0.98, w * 0.42, h * 0.3, 0, Math.PI, 0);
-      ctx.fill();
-      // collar
-      ctx.fillStyle = '#d9cdb0';
-      ctx.beginPath();
-      ctx.moveTo(w * 0.42, h * 0.66);
-      ctx.lineTo(w * 0.5, h * 0.76);
-      ctx.lineTo(w * 0.58, h * 0.66);
-      ctx.fill();
-      // head, lit from the left
-      const fg = ctx.createRadialGradient(w * 0.45, h * 0.4, 6, w * 0.5, h * 0.44, 80);
-      fg.addColorStop(0, '#e2b98e');
-      fg.addColorStop(0.6, '#a87650');
-      fg.addColorStop(1, '#4a2e1c');
-      ctx.fillStyle = fg;
-      ctx.beginPath();
-      ctx.ellipse(w * 0.5, h * 0.45, 52, 68, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(w * 0.5 - 22, h * 0.52, 44, h * 0.12);
-      // hair
-      ctx.fillStyle = ['#1a120c', '#3a2a1a', '#5a4630'][Math.floor(r() * 3)];
-      ctx.beginPath();
-      ctx.ellipse(w * 0.5, h * 0.38, 58, 46, 0, Math.PI, 0);
-      ctx.fill();
-    } else if (kind === 'still') {
-      ctx.fillStyle = grad(0, h, ['#20180f', '#2c2216']);
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#4a3420';
-      ctx.fillRect(0, h * 0.68, w, h * 0.32);
-      ctx.fillStyle = '#5e4428';
-      ctx.fillRect(0, h * 0.68, w, 6);
-      // jug
-      const jg = ctx.createLinearGradient(w * 0.3, 0, w * 0.6, 0);
-      jg.addColorStop(0, '#c8b48a');
-      jg.addColorStop(1, '#4e4230');
-      ctx.fillStyle = jg;
-      ctx.beginPath();
-      ctx.ellipse(w * 0.42, h * 0.56, 52, 66, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(w * 0.42 - 20, h * 0.36, 40, 50);
-      // fruit
-      for (let k = 0; k < 4; k++) {
-        const fx = w * (0.58 + k * 0.08), fy = h * 0.66 - (k % 2) * 10;
-        const g = ctx.createRadialGradient(fx - 6, fy - 6, 2, fx, fy, 22);
-        g.addColorStop(0, k % 2 ? '#e0a040' : '#c84a28');
-        g.addColorStop(1, '#3a1a0c');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(fx, fy, 20, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else {
-      // the ruin on its hill at dusk
-      ctx.fillStyle = grad(0, h * 0.7, ['#283850', '#8a6a5a', '#d8a070']);
-      ctx.fillRect(0, 0, w, h);
-      ridge(h * 0.62, 40, '#5a5060', 0.015);
-      ctx.fillStyle = '#2c3020';
-      ctx.beginPath();
-      ctx.moveTo(0, h);
-      ctx.quadraticCurveTo(w * 0.5, h * 0.48, w, h);
-      ctx.fill();
-      ctx.fillStyle = '#2a241e';
-      ctx.fillRect(w * 0.3, h * 0.52, w * 0.36, h * 0.12); // nave
-      ctx.fillRect(w * 0.6, h * 0.4, w * 0.08, h * 0.24); // tower
-      ctx.beginPath();
-      ctx.moveTo(w * 0.6, h * 0.4);
-      ctx.lineTo(w * 0.64, h * 0.34);
-      ctx.lineTo(w * 0.68, h * 0.4);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(w * 0.38, h * 0.52, 18, Math.PI, 0); // dome
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,180,90,0.9)';
-      ctx.fillRect(w * 0.63, h * 0.45, 5, 8); // lantern in the tower
-    }
-    // brushwork: short directional strokes of light and dark
-    for (let k = 0; k < 900; k++) {
-      ctx.strokeStyle = r() > 0.5 ? `rgba(255,240,210,${r() * 0.05})` : `rgba(0,0,0,${r() * 0.07})`;
-      ctx.lineWidth = 1 + r() * 3;
-      const x = r() * w, y = r() * h, a = (r() - 0.5) * 0.8 + (k % 2 ? 0 : Math.PI / 2) * 0.2;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(a) * (6 + r() * 14), y + Math.sin(a) * (6 + r() * 14));
-      ctx.stroke();
-    }
-    // yellowed varnish + dark edges
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#d9b77a';
-    ctx.fillRect(0, 0, w, h);
-    const vg = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.85);
-    vg.addColorStop(0, '#ffffff');
-    vg.addColorStop(1, '#3a3026');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'source-over';
-    // craquelure
-    ctx.strokeStyle = 'rgba(20,14,8,0.22)';
-    ctx.lineWidth = 0.7;
-    for (let k = 0; k < 70; k++) {
-      let x = r() * w, y = r() * h;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      for (let s = 0; s < 6; s++) {
-        x += (r() - 0.5) * 30;
-        y += (r() - 0.5) * 30;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-    ctx.restore();
-  });
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
 }
 
 function leafTexture() {
@@ -754,14 +550,24 @@ export class Hall {
     let posterBay: number | null = null;
     /* ---------- old paintings in gilt frames along both walls ---------- */
     {
-      const atlas = paintingAtlas();
-      const canvasMat = new THREE.MeshStandardMaterial({
-        map: atlas,
-        emissiveMap: atlas,
-        emissive: new THREE.Color('#ffffff'),
-        emissiveIntensity: 0.16, // picture-lit: they stay readable in the moonlight
-        roughness: 0.55,
-      });
+      // the pictures in the frames: public/media/hall/1…5.jpg (800 × 1000, cropped to the frame), in walk order
+      const loader = new THREE.TextureLoader();
+      const pictureMat = (i: number) => {
+        const m = new THREE.MeshStandardMaterial({
+          color: '#3a3530', // dark until the picture is in
+          emissive: new THREE.Color('#ffffff'),
+          emissiveIntensity: 0.16, // picture-lit: they stay readable in the moonlight
+          roughness: 0.55,
+        });
+        loader.load(`/media/hall/${(i % HALL_PICTURES) + 1}.jpg`, (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = 8;
+          m.map = m.emissiveMap = t;
+          m.color.set('#ffffff');
+          m.needsUpdate = true;
+        });
+        return m;
+      };
       const gilt = new THREE.MeshStandardMaterial({ color: '#8a6a34', roughness: 0.42, metalness: 0.45, emissive: new THREE.Color('#2a1c08'), emissiveIntensity: 0.4 });
       const liner = new THREE.MeshStandardMaterial({ color: '#2a2218', roughness: 0.9 });
       const PW = 1.25, PH = 1.56, FW = 0.15;
@@ -806,13 +612,7 @@ export class Hall {
         g.add(inner);
         const frame = new THREE.Mesh(frameGeo, gilt);
         const lin = new THREE.Mesh(linerGeo, liner);
-        // canvas: map this plane onto its atlas cell
-        const pg = new THREE.PlaneGeometry(PW, PH);
-        const cell = i % (ATLAS_COLS * ATLAS_ROWS);
-        const cu = (cell % ATLAS_COLS) / ATLAS_COLS, cv = 1 - (Math.floor(cell / ATLAS_COLS) + 1) / ATLAS_ROWS;
-        const uv = pg.getAttribute('uv');
-        for (let k = 0; k < uv.count; k++) uv.setXY(k, cu + uv.getX(k) / ATLAS_COLS, cv + uv.getY(k) / ATLAS_ROWS);
-        const pic = new THREE.Mesh(pg, canvasMat);
+        const pic = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), pictureMat(i));
         pic.position.z = 0.035;
         inner.add(frame, lin, pic);
         this.group.add(g);

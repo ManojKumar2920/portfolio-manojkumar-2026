@@ -685,7 +685,7 @@ html.js [data-reveal].in { opacity: 1; transform: none; }
 .fav-tip-year { color: var(--ash); }
 .fav-tip-who { color: var(--sunstone); }
 .fav-tip.is-touch { pointer-events: auto; }
-.fav-tip-open { margin-top: 6px; color: var(--bone); font: 500 14px/1 var(--display); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+.fav-tip-open { margin-top: 1px; color: var(--bone); font: 500 12px/1 var(--display); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
 
 .fav-dialog {
   width: min(760px, calc(100vw - 24px)); max-height: min(86vh, 860px); max-height: min(86dvh, 860px); padding: clamp(24px, 4vw, 44px);

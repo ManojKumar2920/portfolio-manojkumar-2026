@@ -33,7 +33,7 @@ const gh = site.socials.find((s) => s.label === 'GitHub')?.href;
 const availability = availabilityText(); // build-time default; the browser re-computes it (app.ts)
 ---
 
-<Base namespace="about" title="About" description={`${site.name}, ${site.role}: ${site.summary}`}>
+<Base namespace="about" type="profile" title="About" description={`${site.name}, ${site.role}: ${site.summary}`}>
   <div class="page profile" data-profile data-mode="project">
     <div class="pf">
       <div class="pf-top">

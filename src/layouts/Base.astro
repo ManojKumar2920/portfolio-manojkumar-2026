@@ -1,15 +1,38 @@
 ---
 import '../styles/global.css';
 import { site } from '../site';
+import { graph, ORIGIN, PERSON_ID } from '../seo';
 
 interface Props {
   title?: string;
   description?: string;
   namespace: 'home' | 'about' | 'work' | 'works' | 'credits' | 'notfound';
+  /** social card image (absolute path on this site); defaults to the name card */
+  image?: string;
+  /** schema.org nodes for this page, added to the site-wide Person and WebSite */
+  schema?: object[];
+  /** og:type: 'website' for most pages, 'profile' for About, 'article' for case studies */
+  type?: string;
 }
-const { title, description = site.pitch, namespace } = Astro.props;
-const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.role}`;
+const { title, description = site.pitch, namespace, image = '/og.jpg', schema = [], type = 'website' } = Astro.props;
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.role} in Chennai`;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const canonical = new URL(path, ORIGIN).href;
+const imageUrl = new URL(image, ORIGIN).href;
+const noindex = namespace === 'notfound';
+// every page names its subject; the home page also says it is the site's front page
+const pageNode = {
+  '@type': namespace === 'about' ? 'ProfilePage' : 'WebPage',
+  '@id': `${canonical}#page`,
+  url: canonical,
+  name: fullTitle,
+  description,
+  isPartOf: { '@id': `${ORIGIN}/#website` },
+  about: { '@id': PERSON_ID },
+  ...(namespace === 'about' || namespace === 'home' ? { mainEntity: { '@id': PERSON_ID } } : {}),
+  primaryImageOfPage: imageUrl,
+};
+const ld = graph(pageNode, ...schema);
 const links = [
   { href: '/about', label: 'About' },
   { href: '/work', label: 'Work' },
@@ -23,10 +46,33 @@ const links = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content={description} />
+    <meta name="author" content={site.name} />
+    {noindex ? <meta name="robots" content="noindex" /> : <meta name="robots" content="index, follow, max-image-preview:large" />}
+    {!noindex && <link rel="canonical" href={canonical} />}
     <meta name="theme-color" content="#0c0e11" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:url" content={canonical} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${site.name}, ${site.role}`} />
+    {type === 'profile' && <meta property="profile:first_name" content="Manoj" />}
+    {type === 'profile' && <meta property="profile:last_name" content="Kumar" />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" href="/sitemap.xml" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="About this site, for AI assistants" />
+    <script type="application/ld+json" set:html={ld} />
     <link rel="preload" href="/fonts/season-sans-400.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/season-mix-300-italic.woff2" as="font" type="font/woff2" crossorigin />
     {namespace === 'home' && <link rel="preload" href="/models/ruin.glb" as="fetch" crossorigin="anonymous" />}
